@@ -25,6 +25,12 @@ class ExcitonTB:
                     'substrate_dielectric': 3.8}
 
     def __init__(self, hdf5_input, potential='keldysh', args=None):
+        """
+        Exciton calculator for tight-binding models.
+        :param hdf5_input: name of hdf5 input that contains eigensystems
+        :param potential: type of potential used (only keldysh for now)
+        :param args: potential parameters
+        """
         self.potential = potential
         self.interaction_args = self.default_args if args is None else args
 
@@ -52,6 +58,13 @@ class ExcitonTB:
                                                              self.n_orbs)
 
     def get_eh_int(self, nat, nk, pos_list):
+        """
+        Get electron hole interaction matrix for a matrix of points
+        :param nat: Number of atoms in the cell
+        :param nk: nk X nk k grid.
+        :param pos_list: list of positions of the periodic supercell points.
+        :return:
+        """
         b1, b2 = self.b1/nk, self.b2/nk
         nk2 = nk**2
 
@@ -96,6 +109,14 @@ class ExcitonTB:
         return tij
 
     def fourier_keld(self, pos, i, j, kpt):
+        """
+        Keldysh lattice fourier transform
+        :param pos: position of the cell in the supercell grid
+        :param i: ith index of atom in cell
+        :param j: jth index of atom in cell
+        :param kpt: k point for the exponential
+        :return:
+        """
         radius_0 = self.interaction_args['keldysh_r0']
         alat = self.alat
         ep12 = 0.5*(1 + self.interaction_args['substrate_dielectric'])
@@ -204,7 +225,7 @@ class ExcitonTB:
                             ml1, ml2 = (m1 - l1) % nk, (m2 - l2) % nk
 
                         ki_m, ki_l = m1*nk + m2, l1*nk + l2
-                        m_shf, l_shf = ki_m*norb, ki_l*norb
+                        m_shf, l_shf = ki_m*2*norb, ki_l*2*norb
                         id_string = self.four_point_str % (m1, m2, l1, l2)
                         kpts = spins.create_group(id_string)
 
@@ -245,8 +266,8 @@ class ExcitonTB:
                             # for c1, k and c2, k' find matrix element
                             cm_i = c1*c_num_l + c2
                             conduction[:, cm_i] = reduced_tb_vec(
-                                eigvecs[e_m:e_m + norb, self.n_val + c1],
-                                eigvecs[e_l:e_l + norb, self.n_val + c2],
+                                eigvecs[e_m:e_m + norb, v_num_m + c1],
+                                eigvecs[e_l:e_l + norb, v_num_l + c2],
                                 nat,
                                 self.cumulative_positions
                             )
@@ -262,6 +283,15 @@ class ExcitonTB:
                         del conduction, valence
 
     def get_diag_eigvals(self, k_idx, kq_idx, q_crys, direct, h5_file):
+        """
+        Get the diagonal elements of the bse matrix,
+        :param k_idx:
+        :param kq_idx:
+        :param q_crys:
+        :param direct:
+        :param h5_file:
+        :return:
+        """
 
         energy_k = np.array(h5_file['eigensystem']['eigenvalues'][k_idx])
 
@@ -309,7 +339,7 @@ class ExcitonTB:
                                                         h5_file=f)
 
             for s0 in range(2):
-                k_skip = k_i*(block_skip//2)
+                k_skip = k_i*block_skip
                 # Note: Should the below line use kp_i?
                 cnum1, vnum1 = n_con, n_val
 
@@ -335,8 +365,8 @@ class ExcitonTB:
                         k_str=self.four_point_str % tuple(kkp_1bz)
                     )
 
-                    k_skip = k_i*(block_skip//2)
-                    kp_skip = kp_i*(block_skip//2)
+                    k_skip = k_i*block_skip
+                    kp_skip = kp_i*block_skip
                     cnum1, cnum2 = n_con, n_con
                     vnum1, vnum2 = n_val, n_val
 

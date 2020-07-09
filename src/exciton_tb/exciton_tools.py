@@ -59,7 +59,6 @@ def get_supercell_positions(a1, a2, nk):
         position_list.append(r_position)
     return position_list
 
-
 def get_cumulative_positions(pattern, norb):
 
     p_sum = sum(pattern)
