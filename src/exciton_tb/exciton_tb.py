@@ -8,6 +8,7 @@ import numpy.linalg as napla
 
 from .exciton_tools import get_complex_zeros, tr_keld, \
                            get_cumulative_positions, reduced_tb_vec, \
+                           recentre_continuous, \
                            get_supercell_positions
 
 def cplx_exp_dot(vec1, vec2):
@@ -122,7 +123,9 @@ class ExcitonTB:
         ep12 = 0.5*(1 + self.interaction_args['substrate_dielectric'])
 
         tij = self.get_vector_diff_modulo_cell(i, j)
-        tij_cent = tij - self.centre_point
+        # tij_cent = tij - self.centre_point
+        xij_1, xij_2 = recentre_continuous(tij, b1=self.b1, b2=self.b2)
+        tij_cent = xij_1*self.a1 + xij_2*self.a2
         r_vec = pos + tij_cent
 
         fourier_term = tr_keld(napla.norm(r_vec), radius_0, ep12, alat)
