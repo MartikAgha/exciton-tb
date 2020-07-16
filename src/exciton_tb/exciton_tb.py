@@ -52,6 +52,7 @@ class ExcitonTB:
         self.k_grid = np.array(self.file_storage['eigensystem']['k_grid'])
         self.r_grid = get_supercell_positions(self.a1, self.a2, self.n_k)
 
+        self.trunc_alat = float(np.array(self.file_storage['crystal']['trunc_alat']))
         self.motif_vectors = np.array(self.file_storage['crystal']['motif'])
         self.centre_point = np.array(self.file_storage['crystal']['centre'])
         orb_pattern = list(self.file_storage['crystal']['orb_pattern'])
@@ -119,7 +120,7 @@ class ExcitonTB:
         :return:
         """
         radius_0 = self.interaction_args['keldysh_r0']
-        alat = self.alat
+        alat = self.trunc_alat
         ep12 = 0.5*(1 + self.interaction_args['substrate_dielectric'])
 
         tij = self.get_vector_diff_modulo_cell(i, j)
