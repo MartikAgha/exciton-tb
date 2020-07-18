@@ -131,7 +131,7 @@ class ExcitonTB:
 
         fourier_term = tr_keld(napla.norm(r_vec), radius_0, ep12, alat)
         if kpt is not None:
-            fourier_term *= cplx_exp_dot(kpt, r_vec)
+            fourier_term *= cplx_exp_dot(kpt, pos)
 
         return fourier_term
 
