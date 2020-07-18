@@ -105,8 +105,8 @@ class ExcitonTB:
         lattice vectors so that the separation vector is within the unit cell.
         """
         tdiff = self.motif_vectors[i] - self.motif_vectors[j]
-        n1 = (np.dot(tdiff, self.b1)/2/np.pi)//1
-        n2 = (np.dot(tdiff, self.b2)/2/np.pi)//1
+        n1 = np.round((np.dot(tdiff, self.b1)/2/np.pi), 7)//1
+        n2 = np.round((np.dot(tdiff, self.b2)/2/np.pi), 7)//1
         tij = tdiff - n1*self.a1 - n2*self.a2
         return tij
 
@@ -124,7 +124,6 @@ class ExcitonTB:
         ep12 = 0.5*(1 + self.interaction_args['substrate_dielectric'])
 
         tij = self.get_vector_diff_modulo_cell(i, j)
-        # tij_cent = tij - self.centre_point
         xij_1, xij_2 = recentre_continuous(tij, b1=self.b1, b2=self.b2)
         tij_cent = xij_1*self.a1 + xij_2*self.a2
         r_vec = pos + tij_cent
@@ -141,7 +140,7 @@ class ExcitonTB:
         :param split:
         :return:
         """
-        n_val, n_con, nk2 = self.n_con, self.n_val, self.n_k**2
+        n_val, n_con, nk2 = self.n_val, self.n_con, self.n_k**2
         mat_dim = [n_val*n_con*nk2, n_val*n_con*nk2] if split else 2*n_val*n_con*nk2
         final_cumul, rdim, rdim_spl = None, 0, [0, 0]
         # Make cumulative positions of elements in matrix to navigate
@@ -317,7 +316,7 @@ class ExcitonTB:
     def read_scatter_matrix(self, element_storage, s_str, k_str):
         return np.array(element_storage[s_str][k_str]['mat_elems'])
 
-    def get_bse_eigensystem_direct(self, matrix_element_storage):
+    def get_bse_eigensystem_direct(self, matrix_element_storage, solve=True):
         f = self.file_storage
         g = hp.File(matrix_element_storage, 'r')
         nk, nk2 = self.n_k, self.n_k**2
@@ -387,5 +386,8 @@ class ExcitonTB:
 
                             bse_mat[s0][fin_idx, init_idx] -= int_term
 
-        exciton_eigensystems = [napla.eigh(bse_mat[i]) for i in range(2)]
+        if solve:
+            exciton_eigensystems = [napla.eigh(bse_mat[i]) for i in range(2)]
+        else:
+            exciton_eigensystems = bse_mat
         return exciton_eigensystems

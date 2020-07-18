@@ -44,7 +44,7 @@ def recentre(m1, m2, nk):
 
 def recentre_continuous(r, b1, b2):
     x1, x2 = np.dot(b1, r)/2/np.pi, np.dot(b2, r)/2/np.pi
-    x1p, x2p = x1 - int(x1 > 0.5), x2 - int(x2 > 0.5)
+    x1p, x2p = x1 - float(int(x1 > 0.5)), x2 - float(int(x2 > 0.5))
     return x1p, x2p
 
 def recentre_idx(radius, i, j, nc, a1, a2):
