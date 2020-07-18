@@ -16,8 +16,9 @@ def cplx_exp_dot(vec1, vec2):
 
 class ExcitonTB:
 
-    four_point_str = 'k(%d,%d,%d,%d)'
+    one_point_str = 'k(%d)'
     two_point_str = 'k(%d,%d)'
+    four_point_str = 'k(%d,%d,%d,%d)'
 
     hermitian_msg = "{} != {} , Not hermitian"
     hermitian_rounding_dp = 8
@@ -58,6 +59,8 @@ class ExcitonTB:
         orb_pattern = list(self.file_storage['crystal']['orb_pattern'])
         self.cumulative_positions = get_cumulative_positions(orb_pattern,
                                                              self.n_orbs)
+
+        self.selective_mode = bool(np.array(self.file_storage['selective']))
 
     def get_eh_int(self, nat, nk, pos_list):
         """
@@ -141,18 +144,19 @@ class ExcitonTB:
         :return:
         """
         n_val, n_con, nk2 = self.n_val, self.n_con, self.n_k**2
-        mat_dim = [n_val*n_con*nk2, n_val*n_con*nk2] if split else 2*n_val*n_con*nk2
+        valcon = n_val*n_con
+        mat_dim = [valcon*nk2, valcon*nk2] if split else 2*valcon*nk2
         final_cumul, rdim, rdim_spl = None, 0, [0, 0]
         # Make cumulative positions of elements in matrix to navigate
         cmax_s, vmin_s = [], []
 
-        two_point_str = 'k(%d,%d)'
-        if bool(np.array(self.file_storage['selective'])):
+        one_point_str = self.one_point_str
+        if self.selective_mode:
             cumul = []
             cumul_spl = [[], []]
-            for m1, m2 in product(range(self.n_k), range(self.n_k)):
-                vmin = list(self.file_storage[two_point_str % (m1, m2)]['Vmin'])
-                cmax = list(self.file_storage[two_point_str % (m1, m2)]['Cmax'])
+            for idx in range(len(self.k_grid)):
+                vmin = list(self.file_storage[one_point_str % idx]['vb_min'])
+                cmax = list(self.file_storage[one_point_str % idx]['cb_max'])
 
                 for s0 in range(2):
                     if split:
@@ -163,30 +167,34 @@ class ExcitonTB:
                     else:
                         cumul.append(rdim)
                         rdim += (n_val - vmin[s0])*(cmax[s0] - n_val)
-            mat_dim = rdim_spl if split else rdim
-            final_cumul = cumul_spl if split else cumul
+            if split:
+                mat_dim = rdim_spl
+                final_cumul = cumul_spl
+            else:
+                mat_dim = rdim
+                final_cumul = cumul
 
         return mat_dim, final_cumul, cmax_s, vmin_s
 
-    def get_conduction_indices(self, m1, m2, l1, l2, s0, f):
-        if bool(np.array(f['selective'])):
-            c_num_m = list(f[self.two_point_str % (m1, m2)]['Cmax'])[s0] - self.n_val
-            c_num_l = list(f[self.two_point_str % (l1, l2)]['Cmax'])[s0] - self.n_val
+    def get_conduction_indices(self, m_idx, l_idx, s0, f):
+        n_val, n_con = self.n_val, self.n_con
+        if self.selective_mode:
+            c_num_m = list(f[self.one_point_str % m_idx]['cb_max'])[s0] - n_val
+            c_num_l = list(f[self.one_point_str % l_idx]['cb_max'])[s0] - n_val
         else:
-            c_num_m, c_num_l = self.n_con, self.n_con
+            c_num_m, c_num_l = n_con, n_con
 
         return c_num_m, c_num_l
 
-    def get_valence_indices(self, m1, m2, l1, l2, s0, f):
-
-        if bool(np.array(f['selective'])):
-            v_min_m = list(f[self.two_point_str % (m1, m2)]['Vmin'])[s0]
-            v_min_l = list(f[self.two_point_str % (l1, l2)]['Vmin'])[s0]
-            v_num_m = self.n_val - list(f[self.two_point_str % (m1, m2)]['Vmin'])[s0]
-            v_num_l = self.n_val - list(f[self.two_point_str % (l1, l2)]['Vmin'])[s0]
+    def get_valence_indices(self, m_idx, l_idx, s0, f):
+        n_val, n_con = self.n_val, self.n_con
+        if self.selective_mode:
+            v_min_m = list(f[self.one_point_str % m_idx]['vb_min'])[s0]
+            v_min_l = list(f[self.one_point_str % l_idx]['vb_min'])[s0]
+            v_num_m, v_num_l = n_val - v_min_m, n_val - v_min_l
         else:
             v_min_m, v_min_l = 0, 0
-            v_num_m, v_num_l = self.n_val, self.n_val
+            v_num_m, v_num_l = n_val, n_val
 
         return v_min_m, v_min_l, v_num_m, v_num_l
 
@@ -210,7 +218,7 @@ class ExcitonTB:
             eigvecs = np.array(self.file_storage['eigensystem']['eigenvectors'])
             eh_int = self.get_eh_int(nat, nk, pos_list)
             f['VkM'] = eh_int
-            f['selective'] = False  #for now
+            f['selective'] = False
             nk_shift = nk if nk == 1 else 2*nk
 
             for s0 in range(2):
@@ -233,12 +241,12 @@ class ExcitonTB:
                         kpts = spins.create_group(id_string)
 
                         valence_idx = self.get_valence_indices(
-                            m1, m2, l1, l2, s0, f
+                            ki_m, ki_l, s0, f
                         )
                         v_min_m, v_min_l, v_num_m, v_num_l = valence_idx
 
                         conduction_idx = self.get_conduction_indices(
-                            m1, m2, l1, l2, s0, f
+                            ki_m, ki_l, s0, f
                         )
                         c_num_m, c_num_l = conduction_idx
 

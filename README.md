@@ -36,4 +36,16 @@ hdf5 format with subdivisions:
 
         - 'n_val': number of valence band states
 
-'selective': For now just set to False
+'selective': The number of bands to be used in the system are limited to avoid
+using all transitions when calculating the excitons, and instead to use a
+limited subset of bands.
+
+'band_edges': If selective is True, the minvalence band and max conduction band
+
+    - 'num_states': number of states included in each eigensystem
+
+    - 'k(idx)' idx of the kpt in the k_grid:
+
+            - 'vb_min': minimum valence band (conduction band minimum at index 0)
+
+            - 'cb_max': maximum conduction band (conduction band minimum at index 0)
