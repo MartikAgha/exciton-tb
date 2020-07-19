@@ -46,6 +46,6 @@ limited subset of bands.
 
     - 'k(idx)' idx of the kpt in the k_grid:
 
-            - 'vb_min': minimum valence band (conduction band minimum at index 0)
+            - 'vb_num': number of valence bands
 
-            - 'cb_max': maximum conduction band (conduction band minimum at index 0)
+            - 'cb_num': number of conduction bands

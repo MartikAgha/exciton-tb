@@ -61,6 +61,10 @@ class ExcitonTB:
                                                              self.n_orbs)
 
         self.selective_mode = bool(np.array(self.file_storage['selective']))
+        if self.selective_mode:
+            self.num_states = int(np.array(
+                self.file_storage['band_edges']['num_states']
+            ))
 
     def get_eh_int(self, nat, nk, pos_list):
         """
@@ -148,25 +152,22 @@ class ExcitonTB:
         mat_dim = [valcon*nk2, valcon*nk2] if split else 2*valcon*nk2
         final_cumul, rdim, rdim_spl = None, 0, [0, 0]
         # Make cumulative positions of elements in matrix to navigate
-        cmax_s, vmin_s = [], []
 
         one_point_str = self.one_point_str
         if self.selective_mode:
             cumul = []
             cumul_spl = [[], []]
             for idx in range(len(self.k_grid)):
-                vmin = list(self.file_storage[one_point_str % idx]['vb_min'])
-                cmax = list(self.file_storage[one_point_str % idx]['cb_max'])
+                v_num = list(self.file_storage[one_point_str % idx]['vb_num'])
+                c_num = list(self.file_storage[one_point_str % idx]['cb_num'])
 
                 for s0 in range(2):
                     if split:
                         cumul_spl[s0].append(rdim_spl[s0])
-                        rdim_spl[s0] += (n_val - vmin[s0])*(cmax[s0] - n_val)
-                        cmax_s.append(cmax[s0])
-                        vmin_s.append(vmin[s0])
+                        rdim_spl[s0] += v_num[s0]*c_num[s0]
                     else:
                         cumul.append(rdim)
-                        rdim += (n_val - vmin[s0])*(cmax[s0] - n_val)
+                        rdim += v_num[s0]*c_num[s0]
             if split:
                 mat_dim = rdim_spl
                 final_cumul = cumul_spl
@@ -174,29 +175,31 @@ class ExcitonTB:
                 mat_dim = rdim
                 final_cumul = cumul
 
-        return mat_dim, final_cumul, cmax_s, vmin_s
+        return mat_dim, final_cumul
 
-    def get_conduction_indices(self, m_idx, l_idx, s0, f):
+    def get_number_of_conduction_bands(self, m_idx, l_idx, s0):
         n_val, n_con = self.n_val, self.n_con
+        one_point_str = self.one_point_str
+        f = self.file_storage
         if self.selective_mode:
-            c_num_m = list(f[self.one_point_str % m_idx]['cb_max'])[s0] - n_val
-            c_num_l = list(f[self.one_point_str % l_idx]['cb_max'])[s0] - n_val
+            cnum_m = list(f['band_edges'][one_point_str % m_idx]['cb_num'])[s0]
+            cnum_l = list(f['band_edges'][one_point_str % l_idx]['cb_num'])[s0]
         else:
-            c_num_m, c_num_l = n_con, n_con
+            cnum_m, cnum_l = n_con, n_con
 
-        return c_num_m, c_num_l
+        return cnum_m, cnum_l
 
-    def get_valence_indices(self, m_idx, l_idx, s0, f):
+    def get_number_of_valence_bands(self, m_idx, l_idx, s0):
         n_val, n_con = self.n_val, self.n_con
+        one_point_str = self.one_point_str
+        f = self.file_storage
         if self.selective_mode:
-            v_min_m = list(f[self.one_point_str % m_idx]['vb_min'])[s0]
-            v_min_l = list(f[self.one_point_str % l_idx]['vb_min'])[s0]
-            v_num_m, v_num_l = n_val - v_min_m, n_val - v_min_l
+            vnum_m = list(f['band_edges'][one_point_str % m_idx]['vb_num'])[s0]
+            vnum_l = list(f['band_edges'][one_point_str % l_idx]['vb_num'])[s0]
         else:
-            v_min_m, v_min_l = 0, 0
-            v_num_m, v_num_l = n_val, n_val
+            vnum_m, vnum_l = n_val, n_val
 
-        return v_min_m, v_min_l, v_num_m, v_num_l
+        return vnum_m, vnum_l
 
     def create_matrix_element_hdf5(self, element_storage):
         """
@@ -218,8 +221,9 @@ class ExcitonTB:
             eigvecs = np.array(self.file_storage['eigensystem']['eigenvectors'])
             eh_int = self.get_eh_int(nat, nk, pos_list)
             f['VkM'] = eh_int
-            f['selective'] = False
             nk_shift = nk if nk == 1 else 2*nk
+
+            num_states = self.num_states if self.selective_mode else norb
 
             for s0 in range(2):
                 # Two separate sets for up and down spin for non-exchange
@@ -236,26 +240,26 @@ class ExcitonTB:
                             ml1, ml2 = (m1 - l1) % nk, (m2 - l2) % nk
 
                         ki_m, ki_l = m1*nk + m2, l1*nk + l2
-                        m_shf, l_shf = ki_m*2*norb, ki_l*2*norb
-                        id_string = self.four_point_str % (m1, m2, l1, l2)
-                        kpts = spins.create_group(id_string)
 
-                        valence_idx = self.get_valence_indices(
-                            ki_m, ki_l, s0, f
+                        valence_idx = self.get_number_of_valence_bands(
+                            ki_m, ki_l, s0
                         )
-                        v_min_m, v_min_l, v_num_m, v_num_l = valence_idx
+                        v_num_m, v_num_l = valence_idx
 
-                        conduction_idx = self.get_conduction_indices(
-                            ki_m, ki_l, s0, f
+                        conduction_idx = self.get_number_of_conduction_bands(
+                            ki_m, ki_l, s0
                         )
                         c_num_m, c_num_l = conduction_idx
 
-                        e_m, e_l = m_shf + s0*norb, l_shf + s0*norb
+                        valence = np.zeros((nat, v_num_m*v_num_l),
+                                           dtype='complex')
+                        conduction = np.zeros((nat, c_num_m*c_num_l),
+                                              dtype='complex')
 
-                        valence = np.zeros(
-                            (nat, v_num_m*v_num_l),
-                            dtype='complex'
-                        )
+                        m_shf, l_shf = ki_m*2*num_states, ki_l*2*num_states
+                        id_string = self.four_point_str % (m1, m2, l1, l2)
+                        kpts = spins.create_group(id_string)
+                        e_m, e_l = m_shf + s0*num_states, l_shf + s0*num_states
 
                         vb_iter = product(range(v_num_m), range(v_num_l))
                         for v1, v2 in vb_iter:
@@ -263,15 +267,11 @@ class ExcitonTB:
                             # This is reversed compared to conduction band
                             vm_i = v2*v_num_m + v1
                             valence[:, vm_i] = reduced_tb_vec(
-                                eigvecs[e_l:e_l + norb, v2 + v_min_l],
-                                eigvecs[e_m:e_m + norb, v1 + v_min_m],
+                                eigvecs[e_l:e_l + num_states, v2],
+                                eigvecs[e_m:e_m + num_states, v1],
                                 nat,
                                 self.cumulative_positions
                             )
-                        conduction = np.zeros(
-                            (nat, c_num_m*c_num_l),
-                            dtype='complex'
-                        )
                         cb_iter = product(range(c_num_m), range(c_num_l))
                         for c1, c2 in cb_iter:
                             # for c1, k and c2, k' find matrix element
@@ -328,12 +328,9 @@ class ExcitonTB:
         f = self.file_storage
         g = hp.File(matrix_element_storage, 'r')
         nk, nk2 = self.n_k, self.n_k**2
-        norb, nat = self.n_orbs, self.n_atoms
         n_val, n_con = self.n_val, self.n_con
 
-        mat_dim, cumulSpl, Cmax_s, Vmin_s = self.get_matrix_dimensions(
-            split=True
-        )
+        mat_dim, cumulSpl = self.get_matrix_dimensions(split=True)
         block_skip = n_con*n_val
         spin_shift = n_con + n_val
         bse_mat = [get_complex_zeros(mat_dim[i]) for i in range(2)]
