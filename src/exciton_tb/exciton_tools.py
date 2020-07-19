@@ -1,19 +1,19 @@
-from subprocess import Popen
 from itertools import product
 
 import numpy as np
 import scipy as sp
 import scipy.special as spec
 
-def remove(file):
-    """Remove file."""
-    Popen("rm -rf %s" % file, shell=True)
 
 def get_complex_zeros(square_dimension):
     return sp.zeros((square_dimension, square_dimension), dtype=complex)
 
 def cplx_exp_dot(vec1, vec2):
     return np.exp(-1j*np.dot(vec1, vec2))
+
+def conj_dot(vec1, vec2):
+    """Returns complex vector inner product <vec1|vec2>"""
+    return np.dot(np.conj(vec1.T), vec2)
 
 def hermite_mat_prod(mat_1, mat_2):
     return sp.mat(np.dot(np.conj(mat_1.T), mat_2))
@@ -31,13 +31,6 @@ def tr_keld(radius, radius_0, ep12, alat):
 
     return truncated_keldysh
 
-def supercell_term(ukc1, ukpc2, ukv1, ukpv2, vkm, nc):
-    """BSE matrix element for supercell."""
-    matrix_element_vec_left = reduced_tb_vec(ukc1, ukpc2, nc)
-    matrix_element_vec_right = np.dot(vkm, reduced_tb_vec(ukpv2, ukv1, nc))
-
-    return np.dot(matrix_element_vec_left, matrix_element_vec_right)
-
 def recentre(m1, m2, nk):
     """Given corner-centred coords, finds midpoint-centred coords."""
     return [m1 - int(m1 > nk // 2)*nk, m2 - int(m2 > nk // 2)*nk]
@@ -52,9 +45,12 @@ def recentre_idx(radius, i, j, nc, a1, a2):
     rec_idx = recentre((i % nc - j % nc) % nc, (i//nc - j//nc) % nc, nc)
     return radius + rec_idx[0]*a1 + rec_idx[1]*a2
 
-def conj_dot(vec1, vec2):
-    """Returns complex vector inner product <vec1|vec2>"""
-    return np.dot(np.conj(vec1.T), vec2)
+def fix_consistent_gauge(vector):
+    """Fix a vector with a consistent gauge depending on its elements"""
+    full_sum = vector.ravel().sum()
+    quotient_phase = full_sum/np.abs(full_sum)
+    fixed_vector = vector/quotient_phase
+    return fixed_vector
 
 def get_supercell_positions(a1, a2, nk):
     position_list = []
@@ -73,7 +69,6 @@ def get_cumulative_positions(pattern, norb):
     cumul_term = lambda i: (i//p_len)*p_sum + sum(pattern[:(i % p_len) + 1])
     cumulative_positions = [0] + [cumul_term(i) for i in range(norb)]
     return cumulative_positions
-
 
 def reduced_tb_vec(v1, v2, nat, cumul_pos):
     """

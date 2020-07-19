@@ -8,8 +8,7 @@ import numpy.linalg as napla
 
 from .exciton_tools import get_complex_zeros, tr_keld, \
                            get_cumulative_positions, reduced_tb_vec, \
-                           recentre_continuous, \
-                           get_supercell_positions
+                           recentre_continuous, get_supercell_positions
 
 def cplx_exp_dot(vec1, vec2):
     return np.exp(-1j*np.dot(vec1, vec2))
