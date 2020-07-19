@@ -141,41 +141,43 @@ class ExcitonTB:
 
         return fourier_term
 
-    def get_matrix_dimensions(self, split=True):
+    def get_matrix_dim_and_block_starts(self, split=True):
         """
         Get matrix dimensions.
         :param split:
-        :return:
+        :return: matrix_dimension, block_skips
         """
         n_val, n_con, nk2 = self.n_val, self.n_con, self.n_k**2
+        f = self.file_storage
         valcon = n_val*n_con
         mat_dim = [valcon*nk2, valcon*nk2] if split else 2*valcon*nk2
-        final_cumul, rdim, rdim_spl = None, 0, [0, 0]
+        block_starts, cumul_position, cumul_position_split = None, 0, [0, 0]
         # Make cumulative positions of elements in matrix to navigate
 
         one_point_str = self.one_point_str
         if self.selective_mode:
-            cumul = []
-            cumul_spl = [[], []]
+            blocks = []
+            blocks_split = [[], []]
             for idx in range(len(self.k_grid)):
-                v_num = list(self.file_storage[one_point_str % idx]['vb_num'])
-                c_num = list(self.file_storage[one_point_str % idx]['cb_num'])
+                v_num = list(f['band_edges'][one_point_str % idx]['vb_num'])
+                c_num = list(f['band_edges'][one_point_str % idx]['cb_num'])
 
                 for s0 in range(2):
                     if split:
-                        cumul_spl[s0].append(rdim_spl[s0])
-                        rdim_spl[s0] += v_num[s0]*c_num[s0]
+                        blocks_split[s0].append(cumul_position_split[s0])
+                        cumul_position_split[s0] += v_num[s0]*c_num[s0]
                     else:
-                        cumul.append(rdim)
-                        rdim += v_num[s0]*c_num[s0]
-            if split:
-                mat_dim = rdim_spl
-                final_cumul = cumul_spl
-            else:
-                mat_dim = rdim
-                final_cumul = cumul
+                        blocks.append(cumul_position)
+                        cumul_position += v_num[s0]*c_num[s0]
 
-        return mat_dim, final_cumul
+            if split:
+                mat_dim = cumul_position_split
+                block_starts = blocks_split
+            else:
+                mat_dim = cumul_position
+                block_starts = blocks
+
+        return mat_dim, block_starts
 
     def get_number_of_conduction_bands(self, m_idx, l_idx, s0):
         n_val, n_con = self.n_val, self.n_con
@@ -329,8 +331,9 @@ class ExcitonTB:
         g = hp.File(matrix_element_storage, 'r')
         nk, nk2 = self.n_k, self.n_k**2
         n_val, n_con = self.n_val, self.n_con
+        selective = self.selective_mode
 
-        mat_dim, cumulSpl = self.get_matrix_dimensions(split=True)
+        mat_dim, block_starts = self.get_matrix_dim_and_block_starts(split=True)
         block_skip = n_con*n_val
         spin_shift = n_con + n_val
         bse_mat = [get_complex_zeros(mat_dim[i]) for i in range(2)]
@@ -347,17 +350,18 @@ class ExcitonTB:
                                                         h5_file=f)
 
             for s0 in range(2):
-                k_skip = k_i*block_skip
-                # Note: Should the below line use kp_i?
-                cnum1, vnum1 = n_con, n_val
+                k_skip = block_starts[s0][k_i] if selective else k_i*block_skip
+                s_skip = self.num_states if selective else spin_shift
+                cnum1, _ = self.get_number_of_conduction_bands(k_i, 0, s0)
+                vnum1, _ = self.get_number_of_valence_bands(k_i, 0, s0)
 
                 for c, v in product(range(cnum1), range(vnum1)):
                     mat_idx = k_skip + c*vnum1 + v
-
-                    final_energy = energy_kq[n_val + c + s0*spin_shift]
-                    init_energy = energy_k[s0*spin_shift + (n_val - vnum1) + v]
+                    final_energy = energy_kq[vnum1 + c + s0*s_skip]
+                    init_energy = energy_k[v + s0*s_skip]
                     energy_diff = final_energy - init_energy
                     bse_mat[s0][mat_idx, mat_idx] = energy_diff
+
             # No longer needed in memory,
             del energy_k, energy_kq
 
@@ -373,10 +377,14 @@ class ExcitonTB:
                         k_str=self.four_point_str % tuple(kkp_1bz)
                     )
 
-                    k_skip = k_i*block_skip
-                    kp_skip = kp_i*block_skip
-                    cnum1, cnum2 = n_con, n_con
-                    vnum1, vnum2 = n_val, n_val
+                    k_skip = block_starts[s0][k_i] if selective else k_i*block_skip
+                    kp_skip = block_starts[s0][kp_i] if selective else kp_i*block_skip
+                    cnum1, cnum2 = self.get_number_of_conduction_bands(k_i,
+                                                                       kp_i,
+                                                                       s0)
+                    vnum1, vnum2 = self.get_number_of_valence_bands(k_i,
+                                                                    kp_i,
+                                                                    s0)
 
                     cb_iter = product(range(cnum1), range(cnum2))
                     for c1, c2 in cb_iter:
