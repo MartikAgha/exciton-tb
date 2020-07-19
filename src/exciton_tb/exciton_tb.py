@@ -77,17 +77,16 @@ class ExcitonTB:
         nk2 = nk**2
 
         if nk == 1:
-            eh_int = list(sp.zeros((nk2, nat, nat), dtype=complex))
-            for m1, m2 in product(range(nk), range(nk)):
-                pos = pos_list[m1*nk + m2]
-                # We must recentre all into the first unit cell, which we
-                #can then displace by the lattice vector
-                mat_term = np.array([
-                    [self.fourier_keld(pos, i, j, None) for j in range(nat)]
-                    for i in range(nat)
-                ], dtype=complex)
+            eh_int = list(sp.zeros((1, nat, nat), dtype=complex))
+            pos = pos_list[0]
+            # We must recentre all into the first unit cell, which we
+            #can then displace by the lattice vector
+            mat_term = np.array([
+                [self.fourier_keld(pos, i, j, None) for j in range(nat)]
+                for i in range(nat)
+            ], dtype=complex)
 
-                eh_int[m1*nk + m2] += mat_term
+            eh_int[0] += mat_term
         else:
             # This only need be done if we actually sample k-points
             eh_int = list(sp.zeros((4*nk2, nat, nat), dtype=complex))
