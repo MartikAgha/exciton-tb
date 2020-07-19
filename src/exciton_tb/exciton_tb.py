@@ -333,7 +333,7 @@ class ExcitonTB:
         n_val, n_con = self.n_val, self.n_con
         selective = self.selective_mode
 
-        mat_dim, block_starts = self.get_matrix_dim_and_block_starts(split=True)
+        mat_dim, blocks = self.get_matrix_dim_and_block_starts(split=True)
         block_skip = n_con*n_val
         spin_shift = n_con + n_val
         bse_mat = [get_complex_zeros(mat_dim[i]) for i in range(2)]
@@ -350,7 +350,7 @@ class ExcitonTB:
                                                         h5_file=f)
 
             for s0 in range(2):
-                k_skip = block_starts[s0][k_i] if selective else k_i*block_skip
+                k_skip = blocks[s0][k_i] if selective else k_i*block_skip
                 s_skip = self.num_states if selective else spin_shift
                 cnum1, _ = self.get_number_of_conduction_bands(k_i, 0, s0)
                 vnum1, _ = self.get_number_of_valence_bands(k_i, 0, s0)
@@ -377,8 +377,8 @@ class ExcitonTB:
                         k_str=self.four_point_str % tuple(kkp_1bz)
                     )
 
-                    k_skip = block_starts[s0][k_i] if selective else k_i*block_skip
-                    kp_skip = block_starts[s0][kp_i] if selective else kp_i*block_skip
+                    k_skip = blocks[s0][k_i] if selective else k_i*block_skip
+                    kp_skip = blocks[s0][kp_i] if selective else kp_i*block_skip
                     cnum1, cnum2 = self.get_number_of_conduction_bands(k_i,
                                                                        kp_i,
                                                                        s0)

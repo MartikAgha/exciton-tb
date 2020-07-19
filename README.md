@@ -38,7 +38,7 @@ hdf5 format with subdivisions:
 
 'selective': The number of bands to be used in the system are limited to avoid
 using all transitions when calculating the excitons, and instead to use a
-limited subset of bands.
+limited subset of bands. set to True or False.
 
 'band_edges': If selective is True, the minvalence band and max conduction band
 
