@@ -326,7 +326,14 @@ class ExcitonTB:
         return np.array(element_storage[s_str][k_str]['mat_elems'])
 
     def get_bse_eigensystem_direct(self, matrix_element_storage, solve=True):
-        f = self.file_storage
+        """
+        Construct the Hamiltonian (and solve it if necessary) for the
+        Bethe-Salpeter Equation
+        :param matrix_element_storage: HDF5 Storage for the matrix elements.
+        :param solve: Set to True to find the eigenvalues, otherwise will
+                      output the matrix.
+        :return:
+        """
         g = hp.File(matrix_element_storage, 'r')
         nk, nk2 = self.n_k, self.n_k**2
         n_val, n_con = self.n_val, self.n_con
@@ -341,12 +348,12 @@ class ExcitonTB:
         for m1, m2 in product(range(nk), range(nk)):
             k_i = nk*m1 + m2
 
-            # Diagonal elements
+
+            # Diagonal elements: Use cb/vb energy differences
             energy_k, energy_kq = self.get_diag_eigvals(k_idx=k_i,
                                                         kq_idx=k_i,
                                                         q_crys=q_zero,
-                                                        direct=True,
-                                                        h5_file=f)
+                                                        direct=True)
 
             for s0 in range(2):
                 k_skip = blocks[s0][k_i] if selective else k_i*block_skip
@@ -362,15 +369,15 @@ class ExcitonTB:
                     energy_diff = final_energy - init_energy
                     bse_mat[s0][mat_idx, mat_idx] = energy_diff
 
-            # No longer needed in memory,
+            # No longer needed
             del energy_k, energy_kq
 
-            ######################### OFF-DIAGONAL ELEMENTS ##################
+            # Off-diagonal elements:
             for l1, l2 in product(range(nk), range(nk)):
                 kp_i = nk*l1 + l2
                 kkp_1bz = [m1, m2, l1, l2]
-
                 for s0 in range(2):
+                    # Read out precalculated scattering matrix
                     scatter_int = self.read_scatter_matrix(
                         element_storage=g,
                         s_str='s%d' % s0,
@@ -379,6 +386,7 @@ class ExcitonTB:
 
                     k_skip = blocks[s0][k_i] if selective else k_i*block_skip
                     kp_skip = blocks[s0][kp_i] if selective else kp_i*block_skip
+
                     vnum1, cnum1 = self.get_number_conduction_valence_bands(
                         k_i, s0
                     )
@@ -386,21 +394,22 @@ class ExcitonTB:
                         kp_i, s0
                     )
 
-                    cb_iter = product(range(cnum1), range(cnum2))
-                    for c1, c2 in cb_iter:
-                        vb_iter = product(range(vnum1), range(vnum2))
-
-                        for v1, v2 in vb_iter:
+                    for c1, c2 in product(range(cnum1), range(cnum2)):
+                        for v1, v2 in product(range(vnum1), range(vnum2)):
                             fin_idx = k_skip + c1*vnum1 + v1
                             init_idx = kp_skip + c2*vnum2 + v2
 
                             sc_idx = c1*cnum2 + c2, v2*vnum1 + v1
                             int_term = scatter_int[sc_idx[0], sc_idx[1]]
 
+                            # Note the sign of the direct integral
                             bse_mat[s0][fin_idx, init_idx] -= int_term
 
+        # Decide whether to solve or output the hamiltonian to be
+        # diagonalised elsewhere
         if solve:
             exciton_eigensystems = [napla.eigh(bse_mat[i]) for i in range(2)]
         else:
             exciton_eigensystems = bse_mat
+
         return exciton_eigensystems
