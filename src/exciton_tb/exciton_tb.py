@@ -327,9 +327,6 @@ class ExcitonTB:
         )
         return eigvecs
 
-    def read_scatter_matrix(self, element_storage, s_str, k_str):
-        return np.array(element_storage[s_str][k_str]['mat_elems'])
-
     def get_bse_eigensystem_direct(self, matrix_element_storage, solve=True):
         """
         Construct the Hamiltonian (and solve it if necessary) for the
@@ -383,11 +380,9 @@ class ExcitonTB:
                 kkp_1bz = [m1, m2, l1, l2]
                 for s0 in range(2):
                     # Read out precalculated scattering matrix
-                    scatter_int = self.read_scatter_matrix(
-                        element_storage=g,
-                        s_str='s%d' % s0,
-                        k_str=self.four_point_str % tuple(kkp_1bz)
-                    )
+                    k_str = self.four_point_str % tuple(kkp_1bz)
+                    s_str = self.spin_str % s0
+                    scatter_int = np.array(g[s_str][k_str]['mat_elems'])
 
                     k_skip = blocks[s0][k_i] if selective else k_i*block_skip
                     kp_skip = blocks[s0][kp_i] if selective else kp_i*block_skip
@@ -410,6 +405,7 @@ class ExcitonTB:
                             # Note the sign of the direct integral
                             bse_mat[s0][fin_idx, init_idx] -= int_term
 
+        g.close()
         # Decide whether to solve or output the hamiltonian to be
         # diagonalised elsewhere
         if solve:
