@@ -11,7 +11,8 @@ from .exciton_tools import get_complex_zeros, tr_keld, cplx_exp_dot, \
                            recentre_continuous, get_supercell_positions
 
 class ExcitonTB:
-
+    
+    spin_str = 's%d'
     one_point_str = 'k(%d)'
     two_point_str = 'k(%d,%d)'
     four_point_str = 'k(%d,%d,%d,%d)'
@@ -34,25 +35,29 @@ class ExcitonTB:
         self.potential = potential
         self.interaction_args = self.default_args if args is None else args
 
+        # Remains open for the calculation, use self.terminate_storage_usage
+        # when done using this.
         self.file_storage = hp.File(hdf5_input, 'r')
-        # Split is always True for this calculation
+        # Extract geometric information
         self.alat = float(np.array(self.file_storage['crystal']['alat']))
         self.a1 = np.array(self.file_storage['crystal']['avecs']['a1'])
         self.a2 = np.array(self.file_storage['crystal']['avecs']['a2'])
         self.b1 = np.array(self.file_storage['crystal']['gvecs']['b1'])
         self.b2 = np.array(self.file_storage['crystal']['gvecs']['b2'])
+        self.motif_vectors = np.array(self.file_storage['crystal']['motif'])
 
-        # FOR NOW: Assume one orbital per atom
         self.n_atoms = int(np.array(self.file_storage['crystal']['n_atoms']))
         self.n_orbs = int(np.array(self.file_storage['crystal']['n_orbs']))
         self.n_k = int(np.array(self.file_storage['eigensystem']['n_k']))
         self.n_val = int(np.array(self.file_storage['eigensystem']['n_val']))
         self.n_con = int(np.array(self.file_storage['eigensystem']['n_con']))
+
+        # Acrue real-space and reciprocal-space grid.
         self.k_grid = np.array(self.file_storage['eigensystem']['k_grid'])
         self.r_grid = get_supercell_positions(self.a1, self.a2, self.n_k)
 
+        # Value of the position to use ear R-->0 in the interaction potential.
         self.trunc_alat = float(np.array(self.file_storage['crystal']['trunc_alat']))
-        self.motif_vectors = np.array(self.file_storage['crystal']['motif'])
         self.centre_point = np.array(self.file_storage['crystal']['centre'])
         orb_pattern = list(self.file_storage['crystal']['orb_pattern'])
         self.cumulative_positions = get_cumulative_positions(orb_pattern,
@@ -328,7 +333,7 @@ class ExcitonTB:
     def get_bse_eigensystem_direct(self, matrix_element_storage, solve=True):
         """
         Construct the Hamiltonian (and solve it if necessary) for the
-        Bethe-Salpeter Equation
+        Bethe-Salpeter Equation for the direct photonic transitions (Q=0).
         :param matrix_element_storage: HDF5 Storage for the matrix elements.
         :param solve: Set to True to find the eigenvalues, otherwise will
                       output the matrix.
