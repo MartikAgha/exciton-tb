@@ -6,12 +6,9 @@ import numpy as np
 import h5py as hp
 import numpy.linalg as napla
 
-from .exciton_tools import get_complex_zeros, tr_keld, \
+from .exciton_tools import get_complex_zeros, tr_keld, cplx_exp_dot, \
                            get_cumulative_positions, reduced_tb_vec, \
                            recentre_continuous, get_supercell_positions
-
-def cplx_exp_dot(vec1, vec2):
-    return np.exp(-1j*np.dot(vec1, vec2))
 
 class ExcitonTB:
 
@@ -21,6 +18,7 @@ class ExcitonTB:
 
     hermitian_msg = "{} != {} , Not hermitian"
     hermitian_rounding_dp = 8
+    round_dp = 7
 
     default_args = {'keldysh_r0': 33.875,
                     'substrate_dielectric': 3.8}
@@ -28,7 +26,8 @@ class ExcitonTB:
     def __init__(self, hdf5_input, potential='keldysh', args=None):
         """
         Exciton calculator for tight-binding models.
-        :param hdf5_input: name of hdf5 input that contains eigensystems
+        :param hdf5_input: name of hdf5 input that contains crystal information
+                           and eigensystems
         :param potential: type of potential used (only keldysh for now)
         :param args: potential parameters
         """
@@ -77,10 +76,9 @@ class ExcitonTB:
         nk2 = nk**2
 
         if nk == 1:
+            # Only need a single point to calculate the fourier transform
             eh_int = list(sp.zeros((1, nat, nat), dtype=complex))
             pos = pos_list[0]
-            # We must recentre all into the first unit cell, which we
-            #can then displace by the lattice vector
             mat_term = np.array([
                 [self.fourier_keld(pos, i, j, None) for j in range(nat)]
                 for i in range(nat)
@@ -88,9 +86,8 @@ class ExcitonTB:
 
             eh_int[0] += mat_term
         else:
-            # This only need be done if we actually sample k-points
+            # Considering all differences between possible k-points
             eh_int = list(sp.zeros((4*nk2, nat, nat), dtype=complex))
-
             for ml1, ml2 in product(range(2*nk), range(2*nk)):
                 kdiff = (ml1 - nk)*b1 + (ml2 - nk)*b2
                 for r1, r2 in product(range(nk), range(nk)):
@@ -100,7 +97,6 @@ class ExcitonTB:
                          for j in range(nat)]
                         for i in range(nat)
                     ], dtype=complex)
-
                     eh_int[ml1*2*nk + ml2] += mat_term
         return eh_int
 
@@ -108,10 +104,13 @@ class ExcitonTB:
         """
         Get separation between two points in the unit cell, modulo'd by
         lattice vectors so that the separation vector is within the unit cell.
+        :param i: First index of atomic position in self.motif
+        :param j: Second index of atomic position in self.motif
+        :return:
         """
         tdiff = self.motif_vectors[i] - self.motif_vectors[j]
-        n1 = np.round((np.dot(tdiff, self.b1)/2/np.pi), 7)//1
-        n2 = np.round((np.dot(tdiff, self.b2)/2/np.pi), 7)//1
+        n1 = np.round((np.dot(tdiff, self.b1)/2/np.pi), self.round_dp)//1
+        n2 = np.round((np.dot(tdiff, self.b2)/2/np.pi), self.round_dp)//1
         tij = tdiff - n1*self.a1 - n2*self.a2
         return tij
 
@@ -177,29 +176,23 @@ class ExcitonTB:
 
         return mat_dim, block_starts
 
-    def get_number_of_conduction_bands(self, m_idx, l_idx, s0):
-        n_val, n_con = self.n_val, self.n_con
+    def get_number_conduction_valence_bands(self, k_idx, s0):
+        """
+        Extract number of conduction and valence bands for a particular k point
+        index.
+        :param k_idx: index of the k point in self.k_grid
+        :param s0: spin index (if a spinful model)
+        :return: vb_num, cb_num
+        """
         one_point_str = self.one_point_str
         f = self.file_storage
         if self.selective_mode:
-            cnum_m = list(f['band_edges'][one_point_str % m_idx]['cb_num'])[s0]
-            cnum_l = list(f['band_edges'][one_point_str % l_idx]['cb_num'])[s0]
+            cb_num = list(f['band_edges'][one_point_str % k_idx]['cb_num'])[s0]
+            vb_num = list(f['band_edges'][one_point_str % k_idx]['vb_num'])[s0]
         else:
-            cnum_m, cnum_l = n_con, n_con
+            vb_num, cb_num = self.n_val, self.n_con
 
-        return cnum_m, cnum_l
-
-    def get_number_of_valence_bands(self, m_idx, l_idx, s0):
-        n_val, n_con = self.n_val, self.n_con
-        one_point_str = self.one_point_str
-        f = self.file_storage
-        if self.selective_mode:
-            vnum_m = list(f['band_edges'][one_point_str % m_idx]['vb_num'])[s0]
-            vnum_l = list(f['band_edges'][one_point_str % l_idx]['vb_num'])[s0]
-        else:
-            vnum_m, vnum_l = n_val, n_val
-
-        return vnum_m, vnum_l
+        return vb_num, cb_num
 
     def create_matrix_element_hdf5(self, element_storage):
         """
@@ -241,15 +234,15 @@ class ExcitonTB:
 
                         ki_m, ki_l = m1*nk + m2, l1*nk + l2
 
-                        valence_idx = self.get_number_of_valence_bands(
-                            ki_m, ki_l, s0
+                        bandnum_m = self.get_number_conduction_valence_bands(
+                            ki_m, s0
                         )
-                        v_num_m, v_num_l = valence_idx
+                        v_num_m, c_num_m = bandnum_m
 
-                        conduction_idx = self.get_number_of_conduction_bands(
-                            ki_m, ki_l, s0
+                        bandnum_l = self.get_number_conduction_valence_bands(
+                            ki_l, s0
                         )
-                        c_num_m, c_num_l = conduction_idx
+                        v_num_l, c_num_l = bandnum_l
 
                         valence = np.zeros((nat, v_num_m*v_num_l),
                                            dtype='complex')
@@ -350,8 +343,9 @@ class ExcitonTB:
             for s0 in range(2):
                 k_skip = blocks[s0][k_i] if selective else k_i*block_skip
                 s_skip = self.num_states if selective else spin_shift
-                cnum1, _ = self.get_number_of_conduction_bands(k_i, 0, s0)
-                vnum1, _ = self.get_number_of_valence_bands(k_i, 0, s0)
+                vnum1, cnum1 = self.get_number_conduction_valence_bands(
+                    k_i, s0
+                )
 
                 for c, v in product(range(cnum1), range(vnum1)):
                     mat_idx = k_skip + c*vnum1 + v
@@ -377,12 +371,12 @@ class ExcitonTB:
 
                     k_skip = blocks[s0][k_i] if selective else k_i*block_skip
                     kp_skip = blocks[s0][kp_i] if selective else kp_i*block_skip
-                    cnum1, cnum2 = self.get_number_of_conduction_bands(k_i,
-                                                                       kp_i,
-                                                                       s0)
-                    vnum1, vnum2 = self.get_number_of_valence_bands(k_i,
-                                                                    kp_i,
-                                                                    s0)
+                    vnum1, cnum1 = self.get_number_conduction_valence_bands(
+                        k_i, s0
+                    )
+                    vnum2, cnum2 = self.get_number_conduction_valence_bands(
+                        kp_i, s0
+                    )
 
                     cb_iter = product(range(cnum1), range(cnum2))
                     for c1, c2 in cb_iter:
