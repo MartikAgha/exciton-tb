@@ -64,6 +64,10 @@ class ExcitonTB:
                 self.file_storage['band_edges']['num_states']
             ))
 
+    def terminate_storage_usage(self):
+        """Terminate the current usage session of the HDF5 file."""
+        self.file_storage.close()
+
     def get_eh_int(self, nat, nk, pos_list):
         """
         Get electron hole interaction matrix for a matrix of points
@@ -286,19 +290,17 @@ class ExcitonTB:
 
                         del conduction, valence
 
-    def get_diag_eigvals(self, k_idx, kq_idx, q_crys, direct, h5_file):
+    def get_diag_eigvals(self, k_idx, kq_idx, q_crys, direct):
         """
         Get the diagonal elements of the bse matrix,
-        :param k_idx:
-        :param kq_idx:
-        :param q_crys:
-        :param direct:
-        :param h5_file:
+        :param k_idx: First k point index with respect to self.k_grid
+        :param kq_idx: Second k_point index with respect to self.k_grid
+        :param q_crys: Crystal momentum of photon
+        :param direct: Status of a direct excitation calculation
         :return:
         """
-
+        h5_file = self.file_storage
         energy_k = np.array(h5_file['eigensystem']['eigenvalues'][k_idx])
-
         if direct or (q_crys[0] == 0 and q_crys[1] == 0):
             # This doesn't create another instance
             energy_kq = energy_k
@@ -308,6 +310,12 @@ class ExcitonTB:
         return energy_k, energy_kq
 
     def read_eigenvectors(self, idx_pair):
+        """
+        Extract eigenvectors from a certain set of rows.
+        :param idx_pair: Indices to book-end the range of eigenvectors to
+                         extract from
+        :return:
+        """
         i1, i2 = idx_pair[0], idx_pair[1]
         eigvecs = np.array(
             self.file_storage['eigensystem']['eigenvalues'][i1:i2, :]
