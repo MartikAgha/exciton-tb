@@ -1,3 +1,21 @@
+Usage:
+
+Given HDF5 input file 'h5_inp' (see below), use as follows
+(while in 'src' directory):
+
+
+>>> from exciton_tb.exciton_tb import ExcitonTB
+
+>>> extb = ExcitonTB('/path/to/h5_inp')
+
+>>> extb.create_matrix_element_hdf5('name_of_matrix_element.hdf5')
+
+>>> bse_hamiltonian = extb.get_bse_eigensystem_direct(solve=False)
+
+>>> bse_eigensystem = extb.get_bse_eigensystem_direct(solve=True)
+
+
+
 Input file:
 
 hdf5 format with subdivisions:
@@ -15,6 +33,10 @@ hdf5 format with subdivisions:
         - 'motif': list of vectors for all positions in the cell
 
         - 'n_atoms': number of atoms in cell
+
+        - 'n_spins': 1 to treat either spinless system or to not split the
+                     system into two spins. 2 to construct bse_hamiltonians for
+                     spin-up transitions and spin-down transitions.
 
         - 'n_orbs': total number of orbitals in the cell (not including spin)
 

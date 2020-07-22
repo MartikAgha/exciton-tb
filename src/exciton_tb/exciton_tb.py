@@ -175,7 +175,7 @@ class ExcitonTB:
 
                         del conduction, valence
 
-    def get_bse_eigensystem_direct(self, matrix_element_storage, solve=True):
+    def get_bse_eigensystem_direct(self, matrix_element_storage=None, solve=True):
         """
         Construct the Hamiltonian (and solve it if necessary) for the
         Bethe-Salpeter Equation for the direct photonic transitions (Q=0).
@@ -184,7 +184,12 @@ class ExcitonTB:
                       output the matrix.
         :return:
         """
-        g = hp.File(matrix_element_storage, 'r')
+        if matrix_element_storage is None:
+            element_storage = self.element_storage_name
+        else:
+            element_storage = matrix_element_storage
+
+        g = hp.File(element_storage, 'r')
         nk, nk2 = self.n_k, self.n_k**2
         n_val, n_con = self.n_val, self.n_con
         selective = self.selective_mode
