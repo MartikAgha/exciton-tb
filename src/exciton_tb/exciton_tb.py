@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import os
 from itertools import product
 
 import scipy as sp
@@ -6,9 +7,10 @@ import numpy as np
 import h5py as hp
 import numpy.linalg as napla
 
-from .exciton_tools import get_complex_zeros, tr_keld, cplx_exp_dot, \
+from .exciton_tools import get_complex_zeros, cplx_exp_dot, \
                            get_cumulative_positions, reduced_tb_vec, \
                            recentre_continuous, get_supercell_positions
+from .exciton_interactions import interaction_potential
 
 class ExcitonTB:
     
@@ -21,18 +23,27 @@ class ExcitonTB:
     hermitian_rounding_dp = 8
     round_dp = 7
 
-    default_args = {'keldysh_r0': 33.875,
-                    'substrate_dielectric': 3.8}
+    # If args == None, then these will be used.
+    default_args = {'radius_0': 33.875,
+                    'substrate_dielectric': 3.8,
+                    'gamma': 0.1}
 
-    def __init__(self, hdf5_input, potential='keldysh', args=None):
+    # Location matrix elements wil be stored.
+    matrix_element_dir = '../matrix_element_hdf5'
+
+    def __init__(self, hdf5_input, potential_name='keldysh', args=None):
         """
         Exciton calculator for tight-binding models.
         :param hdf5_input: name of hdf5 input that contains crystal information
                            and eigensystems
         :param potential: type of potential used (only keldysh for now)
-        :param args: potential parameters
+        :param args: potential parameters: Dictionary containing interaction
+                                           parameters
+                     {'radius_0': Inherent screening value for keldysh int.,
+                      'substrate_dielectric': dielectric const. of substrate,
+                      'gamma' : Potentiall decay value for Yukawa potential}
         """
-        self.potential = potential
+        self.potential_name = potential_name
         self.interaction_args = self.default_args if args is None else args
 
         # Remains open for the calculation, use self.terminate_storage_usage
@@ -51,6 +62,9 @@ class ExcitonTB:
         self.n_k = int(np.array(self.file_storage['eigensystem']['n_k']))
         self.n_val = int(np.array(self.file_storage['eigensystem']['n_val']))
         self.n_con = int(np.array(self.file_storage['eigensystem']['n_con']))
+        self.n_spins = int(np.array(self.file_storage['eigensystem']['n_spins']))
+        if self.n_spins not in [1, 2]:
+            raise Exception("eigensystem/n_spins must be either 1 or 2.")
 
         # Acrue real-space and reciprocal-space grid.
         self.k_grid = np.array(self.file_storage['eigensystem']['k_grid'])
@@ -69,13 +83,14 @@ class ExcitonTB:
                 self.file_storage['band_edges']['num_states']
             ))
 
-    def create_matrix_element_hdf5(self, element_storage):
+    def create_matrix_element_hdf5(self, storage_name):
         """
         Create matrix elements for the direct coulomb interaction
-        :param element_storage: name for the hdf5 storage for matrix elements.
+        :param storage_name: name for the hdf5 storage for matrix elements.
         :return:
         """
-        self.element_storage_name = element_storage
+        self.element_storage_name = os.path.join(self.matrix_element_dir,
+                                                 storage_name)
         """Create store of eigenvalues, matrix elements and attributes."""
         # Acquire atomic structure parameters.
         nat = self.n_atoms
@@ -85,7 +100,7 @@ class ExcitonTB:
         # Containers for outputted data
         pos_list = self.r_grid
 
-        with hp.File(element_storage, 'w') as f:
+        with hp.File(self.element_storage_name, 'w') as f:
             eigvecs = np.array(self.file_storage['eigensystem']['eigenvectors'])
             eh_int = self.get_eh_int(nat, nk, pos_list)
             f['VkM'] = eh_int
@@ -269,7 +284,7 @@ class ExcitonTB:
             eh_int = list(sp.zeros((1, nat, nat), dtype=complex))
             pos = pos_list[0]
             mat_term = np.array([
-                [self.fourier_keld(pos, i, j, None) for j in range(nat)]
+                [self.fourier_int(pos, i, j, None) for j in range(nat)]
                 for i in range(nat)
             ], dtype=complex)
 
@@ -282,7 +297,7 @@ class ExcitonTB:
                 for r1, r2 in product(range(nk), range(nk)):
                     pos = pos_list[r1*nk + r2]
                     mat_term = np.array([
-                        [self.fourier_keld(pos, i, j, kdiff)/nk2
+                        [self.fourier_int(pos, i, j, kdiff)/nk2
                          for j in range(nat)]
                         for i in range(nat)
                     ], dtype=complex)
@@ -303,25 +318,23 @@ class ExcitonTB:
         tij = tdiff - n1*self.a1 - n2*self.a2
         return tij
 
-    def fourier_keld(self, pos, i, j, kpt):
+    def fourier_int(self, pos, i, j, kpt):
         """
-        Keldysh lattice fourier transform
+        Get the Lattice fourier transform of the interaction potential.
         :param pos: position of the cell in the supercell grid
         :param i: ith index of atom in cell
         :param j: jth index of atom in cell
         :param kpt: k point for the exponential
         :return:
         """
-        radius_0 = self.interaction_args['keldysh_r0']
-        alat = self.trunc_alat
-        ep12 = 0.5*(1 + self.interaction_args['substrate_dielectric'])
-
         tij = self.get_vector_diff_modulo_cell(i, j)
         xij_1, xij_2 = recentre_continuous(tij, b1=self.b1, b2=self.b2)
         tij_cent = xij_1*self.a1 + xij_2*self.a2
-        r_vec = pos + tij_cent
-
-        fourier_term = tr_keld(napla.norm(r_vec), radius_0, ep12, alat)
+        radius = napla.norm(pos + tij_cent)
+        fourier_term = interaction_potential(radius,
+                                             self.potential_name,
+                                             self.interaction_args,
+                                             self.trunc_alat)
         if kpt is not None:
             fourier_term *= cplx_exp_dot(kpt, pos)
 
@@ -376,8 +389,14 @@ class ExcitonTB:
         one_point_str = self.one_point_str
         f = self.file_storage
         if self.selective_mode:
-            cb_num = list(f['band_edges'][one_point_str % k_idx]['cb_num'])[s0]
-            vb_num = list(f['band_edges'][one_point_str % k_idx]['vb_num'])[s0]
+            cb_num = f['band_edges'][one_point_str % k_idx]['cb_num']
+            vb_num = f['band_edges'][one_point_str % k_idx]['vb_num']
+            if self.n_spins == 2:
+                cb_num = list(cb_num)[s0]
+                vb_num = list(vb_num)[s0]
+            else:
+                cb_num = int(np.array(cb_num))
+                vb_num = int(np.array(vb_num))
         else:
             vb_num, cb_num = self.n_val, self.n_con
 

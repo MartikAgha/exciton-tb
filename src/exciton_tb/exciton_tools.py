@@ -2,7 +2,6 @@ from itertools import product
 
 import numpy as np
 import scipy as sp
-import scipy.special as spec
 
 
 def get_complex_zeros(square_dimension):
@@ -17,19 +16,6 @@ def conj_dot(vec1, vec2):
 
 def hermite_mat_prod(mat_1, mat_2):
     return sp.mat(np.dot(np.conj(mat_1.T), mat_2))
-
-def tr_keld(radius, radius_0, ep12, alat):
-    """Truncated Keldysh potential."""
-
-    main_radius = alat if radius < 1e-5 else radius
-
-    term_arg = (main_radius / radius_0)*ep12
-    struve_term = spec.struve(0, term_arg)
-    bessel_term = spec.y0(term_arg)
-
-    truncated_keldysh = 22.59/radius_0*(struve_term - bessel_term)
-
-    return truncated_keldysh
 
 def recentre(m1, m2, nk):
     """Given corner-centred coords, finds midpoint-centred coords."""
