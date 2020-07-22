@@ -41,7 +41,7 @@ class ExcitonTB:
                                            parameters
                      {'radius_0': Inherent screening value for keldysh int.,
                       'substrate_dielectric': dielectric const. of substrate,
-                      'gamma' : Potentiall decay value for Yukawa potential}
+                      'gamma': Potential decay value for Yukawa potential}
         """
         self.potential_name = potential_name
         self.interaction_args = self.default_args if args is None else args
@@ -63,7 +63,7 @@ class ExcitonTB:
         self.n_val = int(np.array(self.file_storage['eigensystem']['n_val']))
         self.n_con = int(np.array(self.file_storage['eigensystem']['n_con']))
         self.n_spins = int(np.array(self.file_storage['eigensystem']['n_spins']))
-        if self.n_spins not in [1, 2]:
+        if not self.n_spins in [1, 2]:
             raise Exception("eigensystem/n_spins must be either 1 or 2.")
 
         # Acrue real-space and reciprocal-space grid.
