@@ -20,6 +20,8 @@ Input file:
 
 hdf5 format with subdivisions:
 
+Resource for h5py usage: http://docs.h5py.org/en/stable/
+
 'crystal': details about the crystal including
 
         - 'alat': lattice parameter

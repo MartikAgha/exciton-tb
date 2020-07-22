@@ -197,10 +197,10 @@ class ExcitonTB:
         n_val, n_con = self.n_val, self.n_con
         selective = self.selective_mode
 
-        mat_dim, blocks = self.get_matrix_dim_and_block_starts(split=True)
+        mat_dim, blocks = self.get_matrix_dim_and_block_starts()
         block_skip = n_con*n_val
         spin_shift = n_con + n_val
-        bse_mat = [get_complex_zeros(mat_dim[i]) for i in range(2)]
+        bse_mat = [get_complex_zeros(mat_dim[i]) for i in range(self.n_spins)]
         q_zero = np.array([0, 0])
 
         for m1, m2 in product(range(nk), range(nk)):
@@ -214,16 +214,18 @@ class ExcitonTB:
                                                         direct=True)
 
             for s0 in range(2):
+                if self.n_spins == 1 and s0 == 1:
+                    continue
                 k_skip = blocks[s0][k_i] if selective else k_i*block_skip
-                s_skip = self.num_states if selective else spin_shift
+                spin_skip = s0*self.num_states if selective else s0*spin_shift
                 vnum1, cnum1 = self.get_number_conduction_valence_bands(
                     k_i, s0
                 )
 
                 for c, v in product(range(cnum1), range(vnum1)):
                     mat_idx = k_skip + c*vnum1 + v
-                    final_energy = energy_kq[vnum1 + c + s0*s_skip]
-                    init_energy = energy_k[v + s0*s_skip]
+                    final_energy = energy_kq[vnum1 + c + spin_skip]
+                    init_energy = energy_k[v + spin_skip]
                     energy_diff = final_energy - init_energy
                     bse_mat[s0][mat_idx, mat_idx] = energy_diff
 
@@ -235,6 +237,8 @@ class ExcitonTB:
                 kp_i = nk*l1 + l2
                 kkp_1bz = [m1, m2, l1, l2]
                 for s0 in range(2):
+                    if self.n_spins == 1 and s0 == 1:
+                        continue
                     # Read out precalculated scattering matrix
                     k_str = self.four_point_str % tuple(kkp_1bz)
                     s_str = self.spin_str % s0
@@ -347,7 +351,7 @@ class ExcitonTB:
 
         return fourier_term
 
-    def get_matrix_dim_and_block_starts(self, split=True):
+    def get_matrix_dim_and_block_starts(self):
         """
         Get matrix dimensions.
         :param split:
@@ -356,7 +360,7 @@ class ExcitonTB:
         n_val, n_con, nk2 = self.n_val, self.n_con, self.n_k**2
         f = self.file_storage
         valcon = n_val*n_con
-        mat_dim = [valcon*nk2, valcon*nk2] if split else 2*valcon*nk2
+        mat_dim = [valcon*nk2]*self.n_spins
         block_starts, cumul_position, cumul_position_split = None, 0, [0, 0]
         # Make cumulative positions of elements in matrix to navigate
 
@@ -369,14 +373,14 @@ class ExcitonTB:
                 c_num = list(f['band_edges'][one_point_str % idx]['cb_num'])
 
                 for s0 in range(2):
-                    if split:
+                    if not self.n_spins == 1:
                         blocks_split[s0].append(cumul_position_split[s0])
                         cumul_position_split[s0] += v_num[s0]*c_num[s0]
                     else:
                         blocks.append(cumul_position)
                         cumul_position += v_num[s0]*c_num[s0]
 
-            if split:
+            if not self.n_spins == 1:
                 mat_dim = cumul_position_split
                 block_starts = blocks_split
             else:
