@@ -72,7 +72,6 @@ class ExcitonTB:
 
         # Value of the position to use ear R-->0 in the interaction potential.
         self.trunc_alat = float(np.array(self.file_storage['crystal']['trunc_alat']))
-        self.centre_point = np.array(self.file_storage['crystal']['centre'])
         orb_pattern = list(self.file_storage['crystal']['orb_pattern'])
         self.cumulative_positions = get_cumulative_positions(orb_pattern,
                                                              self.n_orbs)
