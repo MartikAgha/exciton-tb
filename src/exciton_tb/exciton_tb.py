@@ -106,11 +106,14 @@ class ExcitonTB:
             nk_shift = nk if nk == 1 else 2*nk
 
             num_states = self.num_states if self.selective_mode else norb
+            state_shift = num_states if self.n_spins == 1 else 2*num_states
 
             for s0 in range(2):
+                if self.n_spins == 1 and s0 == 1:
+                    continue
                 # Two separate sets for up and down spin for non-exchange
                 # Assuming a Gamma-point calculation for now in supercell
-                spins = f.create_group('s{}'.format(s0))
+                spins = f.create_group(self.spin_str % s0)
 
                 for m1, m2 in product(range(nk), range(nk)):
                     for l1, l2 in product(range(nk), range(nk)):
@@ -138,7 +141,7 @@ class ExcitonTB:
                         conduction = np.zeros((nat, c_num_m*c_num_l),
                                               dtype='complex')
 
-                        m_shf, l_shf = ki_m*2*num_states, ki_l*2*num_states
+                        m_shf, l_shf = ki_m*state_shift, ki_l*state_shift
                         id_string = self.four_point_str % (m1, m2, l1, l2)
                         kpts = spins.create_group(id_string)
                         e_m, e_l = m_shf + s0*num_states, l_shf + s0*num_states
