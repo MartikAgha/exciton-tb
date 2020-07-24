@@ -40,11 +40,14 @@ def fix_consistent_gauge(vector):
     fixed_vector = vector/quotient_phase
     return fixed_vector
 
-def get_supercell_positions(a1, a2, nk):
+def get_supercell_positions(a1, a2, nk, cell_wise_centering=True):
     position_list = []
     for m1, m2 in product(range(nk), range(nk)):
         # idx is m1*nk + m2 for reference in future functions
-        ms = recentre(m1, m2, nk)
+        if cell_wise_centering:
+            ms = recentre(m1, m2, nk)
+        else:
+            ms = m1, m2
         r_position = ms[0]*a1 + ms[1]*a2
         position_list.append(r_position)
     return position_list

@@ -32,7 +32,8 @@ class ExcitonTB:
     # Location matrix elements wil be stored.
     matrix_element_dir = '../matrix_element_hdf5'
 
-    def __init__(self, hdf5_input, potential_name='keldysh', args=None):
+    def __init__(self, hdf5_input, potential_name='keldysh', args=None,
+                 cell_wise_centering=True):
         """
         Exciton calculator for tight-binding models.
         :param hdf5_input: name of hdf5 input that contains crystal information
@@ -69,7 +70,11 @@ class ExcitonTB:
 
         # Acrue real-space and reciprocal-space grid.
         self.k_grid = np.array(self.file_storage['eigensystem']['k_grid'])
-        self.r_grid = get_supercell_positions(self.a1, self.a2, self.n_k)
+        self.cell_wise_centering = cell_wise_centering
+        self.r_grid = get_supercell_positions(self.a1,
+                                              self.a2,
+                                              self.n_k,
+                                              cell_wise_centering)
 
         # Value of the position to use ear R-->0 in the interaction potential.
         self.trunc_alat = float(np.array(self.file_storage['crystal']['trunc_alat']))
@@ -289,8 +294,8 @@ class ExcitonTB:
         """
         cell_factor = self.n_k if macro_cell else 1
         dot_divider = 2*np.pi*cell_factor
-        n1 = np.round((np.dot(vector, self.b1)/dot_divider), self.round_dp)//1
-        n2 = np.round((np.dot(vector, self.b2)/dot_divider), self.round_dp)//1
+        n1 = (np.dot(vector, self.b1)/dot_divider)//1
+        n2 = (np.dot(vector, self.b2)/dot_divider)//1
         vector_modulo_cell = vector - cell_factor*(n1*self.a1 + n2*self.a2)
         return vector_modulo_cell
 
@@ -360,7 +365,7 @@ class ExcitonTB:
         :return:
         """
         i, j = idx_pair
-        if True:
+        if self.cell_wise_centering:
             # Current method (change bool to True to keep this way)
             tij = self.get_vector_diff_modulo_cell(i, j)
             xij_1, xij_2 = recentre_continuous(tij, b1=self.b1, b2=self.b2)

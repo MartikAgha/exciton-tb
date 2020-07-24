@@ -52,7 +52,7 @@ Resource for h5py usage: http://docs.h5py.org/en/stable/
 
         - 'eigenvectors'
 
-        - 'kgrid': list of reciprocal vectors that are used for the calculations
+        - 'k_grid': list of reciprocal vectors that are used for the calculations
 
         - 'n_k': size of kgrid i.e. the grid will be nk times nk
 
