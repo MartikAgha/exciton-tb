@@ -13,6 +13,7 @@ from .exciton_tools import get_complex_zeros, cplx_exp_dot, \
                            fix_consistent_gauge
 from .exciton_interactions import interaction_potential
 
+
 class ExcitonTB:
     
     spin_str = 's%d'
@@ -111,8 +112,6 @@ class ExcitonTB:
 
         with hp.File(self.element_storage_name, 'w') as f:
             eigvecs = np.array(self.file_storage['eigensystem']['eigenvectors'])
-            if treat_phase:
-                eigvecs = self.treat_phase_of_eigenvectors(eigvecs)
             eh_int = self.get_eh_int(nat, nk, pos_list)
             f['VkM'] = eh_int
             nk_shift = nk if nk == 1 else 2*nk
@@ -130,11 +129,8 @@ class ExcitonTB:
                 for m1, m2 in product(range(nk), range(nk)):
                     for l1, l2 in product(range(nk), range(nk)):
                         # Indices to navigate through k,k' data
-                        if nk > 1:
-                            ml1, ml2 = m1 - l1 + nk, m2 - l2 + nk
-
-                        else:
-                            ml1, ml2 = (m1 - l1) % nk, (m2 - l2) % nk
+                        ml1 = m1 - l1 + nk if nk > 1 else 0
+                        ml2 = m2 - l2 + nk if nk > 1 else 0
 
                         ki_m, ki_l = m1*nk + m2, l1*nk + l2
 
@@ -169,6 +165,7 @@ class ExcitonTB:
                                 nat,
                                 self.cumulative_positions
                             )
+
                         cb_iter = product(range(c_num_m), range(c_num_l))
                         for c1, c2 in cb_iter:
                             # for c1, k and c2, k' find matrix element
@@ -179,6 +176,7 @@ class ExcitonTB:
                                 nat,
                                 self.cumulative_positions
                             )
+
                         elem_shape = (c_num_m*c_num_l, v_num_m*v_num_l)
                         mmm = kpts.create_dataset(name='mat_elems',
                                                   shape=elem_shape,
