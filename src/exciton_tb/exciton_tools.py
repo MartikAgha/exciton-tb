@@ -3,6 +3,7 @@ from itertools import product
 import numpy as np
 import scipy as sp
 
+recentering_precision = 1e-7
 
 def get_complex_zeros(square_dimension):
     return sp.zeros((square_dimension, square_dimension), dtype=complex)
@@ -22,8 +23,9 @@ def recentre(m1, m2, nk):
     return [m1 - int(m1 > nk // 2)*nk, m2 - int(m2 > nk // 2)*nk]
 
 def recentre_continuous(r, b1, b2):
+    threshold = 0.5 + recentering_precision
     x1, x2 = np.dot(b1, r)/2/np.pi, np.dot(b2, r)/2/np.pi
-    x1p, x2p = x1 - float(int(x1 > 0.5)), x2 - float(int(x2 > 0.5))
+    x1p, x2p = x1 - float(int(x1 > threshold)), x2 - float(int(x2 > threshold))
     return x1p, x2p
 
 def recentre_idx(radius, i, j, nc, a1, a2):
@@ -41,6 +43,7 @@ def fix_consistent_gauge(vector):
 def get_supercell_positions(a1, a2, nk):
     position_list = []
     for m1, m2 in product(range(nk), range(nk)):
+        # idx is m1*nk + m2 for reference in future functions
         ms = recentre(m1, m2, nk)
         r_position = ms[0]*a1 + ms[1]*a2
         position_list.append(r_position)

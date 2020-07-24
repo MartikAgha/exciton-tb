@@ -9,7 +9,8 @@ import numpy.linalg as napla
 
 from .exciton_tools import get_complex_zeros, cplx_exp_dot, \
                            get_cumulative_positions, reduced_tb_vec, \
-                           recentre_continuous, get_supercell_positions
+                           recentre_continuous, get_supercell_positions, \
+                           fix_consistent_gauge
 from .exciton_interactions import interaction_potential
 
 class ExcitonTB:
@@ -21,7 +22,7 @@ class ExcitonTB:
 
     hermitian_msg = "{} != {} , Not hermitian"
     hermitian_rounding_dp = 8
-    round_dp = 7
+    round_dp = 10
 
     # If args == None, then these will be used.
     default_args = {'radius_0': 33.875,
@@ -82,10 +83,11 @@ class ExcitonTB:
                 self.file_storage['band_edges']['num_states']
             ))
 
-    def create_matrix_element_hdf5(self, storage_name):
+    def create_matrix_element_hdf5(self, storage_name, treat_phase=False):
         """
         Create matrix elements for the direct coulomb interaction
         :param storage_name: name for the hdf5 storage for matrix elements.
+        :param treat_phase: Fix gauge of phase if
         :return:
         """
         self.element_storage_name = os.path.join(self.matrix_element_dir,
@@ -101,6 +103,8 @@ class ExcitonTB:
 
         with hp.File(self.element_storage_name, 'w') as f:
             eigvecs = np.array(self.file_storage['eigensystem']['eigenvectors'])
+            if treat_phase:
+                eigvecs = self.treat_phase_of_eigenvectors(eigvecs)
             eh_int = self.get_eh_int(nat, nk, pos_list)
             f['VkM'] = eh_int
             nk_shift = nk if nk == 1 else 2*nk
@@ -269,15 +273,33 @@ class ExcitonTB:
         # Decide whether to solve or output the hamiltonian to be
         # diagonalised elsewhere
         if solve:
-            exciton_eigensystems = [napla.eigh(bse_mat[i]) for i in range(2)]
+            exciton_eigsys = [napla.eigh(bse_mat[i]) for i in range(self.n_spins)]
         else:
-            exciton_eigensystems = bse_mat
+            exciton_eigsys = bse_mat
 
-        return exciton_eigensystems
+        return exciton_eigsys
 
     def terminate_storage_usage(self):
         """Terminate the current usage session of the HDF5 file."""
         self.file_storage.close()
+
+    def get_vector_modulo_cell(self, vector, macro_cell=False):
+        """
+        :return:
+        """
+        cell_factor = self.n_k if macro_cell else 1
+        dot_divider = 2*np.pi*cell_factor
+        n1 = np.round((np.dot(vector, self.b1)/dot_divider), self.round_dp)//1
+        n2 = np.round((np.dot(vector, self.b2)/dot_divider), self.round_dp)//1
+        vector_modulo_cell = vector - cell_factor*(n1*self.a1 + n2*self.a2)
+        return vector_modulo_cell
+
+    def create_fourier_matrix(self, pos, pos_idx, kdiff):
+        fmatrix = np.array([
+            [self.fourier_int((i, j), pos, pos_idx, kdiff)
+             for j in range(self.n_atoms)] for i in range(self.n_atoms)
+        ], dtype=complex)/self.n_k**2
+        return fmatrix
 
     def get_eh_int(self, nat, nk, pos_list):
         """
@@ -293,11 +315,11 @@ class ExcitonTB:
         if nk == 1:
             # Only need a single point to calculate the fourier transform
             eh_int = list(sp.zeros((1, nat, nat), dtype=complex))
-            pos = pos_list[0]
-            mat_term = np.array([
-                [self.fourier_int(pos, i, j, None) for j in range(nat)]
-                for i in range(nat)
-            ], dtype=complex)
+            pos_idx = 0
+            pos = pos_list[pos_idx]
+            mat_term = self.create_fourier_matrix(pos=pos,
+                                                  pos_idx=pos_idx,
+                                                  kdiff=None)
 
             eh_int[0] += mat_term
         else:
@@ -306,12 +328,11 @@ class ExcitonTB:
             for ml1, ml2 in product(range(2*nk), range(2*nk)):
                 kdiff = (ml1 - nk)*b1 + (ml2 - nk)*b2
                 for r1, r2 in product(range(nk), range(nk)):
+                    pos_idx = r1*nk + r2
                     pos = pos_list[r1*nk + r2]
-                    mat_term = np.array([
-                        [self.fourier_int(pos, i, j, kdiff)/nk2
-                         for j in range(nat)]
-                        for i in range(nat)
-                    ], dtype=complex)
+                    mat_term = self.create_fourier_matrix(pos=pos,
+                                                          pos_idx=pos_idx,
+                                                          kdiff=kdiff)
                     eh_int[ml1*2*nk + ml2] += mat_term
         return eh_int
 
@@ -324,12 +345,12 @@ class ExcitonTB:
         :return:
         """
         tdiff = self.motif_vectors[i] - self.motif_vectors[j]
-        n1 = np.round((np.dot(tdiff, self.b1)/2/np.pi), self.round_dp)//1
-        n2 = np.round((np.dot(tdiff, self.b2)/2/np.pi), self.round_dp)//1
+        n1 = (np.dot(tdiff, self.b1)/2/np.pi)//1
+        n2 = (np.dot(tdiff, self.b2)/2/np.pi)//1
         tij = tdiff - n1*self.a1 - n2*self.a2
         return tij
 
-    def fourier_int(self, pos, i, j, kpt):
+    def fourier_int(self, idx_pair, pos, pos_idx, kpt):
         """
         Get the Lattice fourier transform of the interaction potential.
         :param pos: position of the cell in the supercell grid
@@ -338,10 +359,24 @@ class ExcitonTB:
         :param kpt: k point for the exponential
         :return:
         """
-        tij = self.get_vector_diff_modulo_cell(i, j)
-        xij_1, xij_2 = recentre_continuous(tij, b1=self.b1, b2=self.b2)
-        tij_cent = xij_1*self.a1 + xij_2*self.a2
-        radius = napla.norm(pos + tij_cent)
+        i, j = idx_pair
+        if True:
+            # Current method (change bool to True to keep this way)
+            tij = self.get_vector_diff_modulo_cell(i, j)
+            xij_1, xij_2 = recentre_continuous(tij, b1=self.b1, b2=self.b2)
+            tij_cent = xij_1*self.a1 + xij_2*self.a2
+            radius = napla.norm(pos + tij_cent)
+        else:
+            # New method (change bool to False to try this way)
+            tij = self.motif_vectors[i] - self.motif_vectors[j]
+            full_pos = pos + tij
+            full_pos_recentered = self.get_vector_modulo_cell(vector=full_pos,
+                                                              macro_cell=True)
+            xij_1, xij_2 = recentre_continuous(full_pos_recentered,
+                                               b1=self.b1*self.n_k,
+                                               b2=self.b2*self.n_k)
+            full_tij = xij_1*self.a1*self.n_k + xij_2*self.a2*self.n_k
+            radius = napla.norm(full_tij)
         fourier_term = interaction_potential(radius,
                                              self.potential_name,
                                              self.interaction_args,
@@ -444,3 +479,23 @@ class ExcitonTB:
             self.file_storage['eigensystem']['eigenvalues'][i1:i2, :]
         )
         return eigvecs
+
+    def treat_phase_of_eigenvectors(self, eigvecs):
+        """
+        STILL NEEDS TESTING: Fix global phase of all eigenvectors in dataset
+        :param eigvecs: set of Eigenvectors
+        :return:
+        """
+        eigcopy = np.array(eigvecs)
+        valcon = self.n_val + self.n_con
+        for idx in range(len(self.k_grid)):
+            k_shift = idx*state_shift
+            if self.n_spins == 1:
+                bandnum = self.get_number_conduction_valence_bands(idx, 0)
+                for jdx in range(bandnum[0] + bandnum[1]):
+                    p, q = k_shift, k_shift + valcon
+                    eigcopy[p:q, jdx] = fix_consistent_gauge(eigvecs[p:q, jdx])
+
+        return eigcopy
+
+
