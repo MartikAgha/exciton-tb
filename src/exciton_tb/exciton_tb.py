@@ -88,6 +88,9 @@ class ExcitonTB:
                 self.file_storage['band_edges']['num_states']
             ))
 
+        if not os.path.exists(self.matrix_element_dir):
+            os.mkdir(self.matrix_element_dir)
+
     def create_matrix_element_hdf5(self, storage_name, treat_phase=False):
         """
         Create matrix elements for the direct coulomb interaction
