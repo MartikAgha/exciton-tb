@@ -78,7 +78,7 @@ class ConductivityTB:
         prefactor = e_charge_2_over_epsilon0 if dielectric_function else 1
         prefactor = prefactor/system_area
 
-        n_shift = self.n_orbs if self.n_spins == 1 else 2*self.n_orbs
+        n_shift = self.n_spins*self.n_orbs
         for idx_1, kpt in enumerate(self.k_grid):
             for s0 in range(2):
                 if self.n_spins == 1 and s0 == 1:
