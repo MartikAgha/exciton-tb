@@ -11,10 +11,6 @@ e_charge_2_over_epsilon0 = 180.79096
 class ConductivityTB:
 
     reach_multiplier = 10
-    polarisation_vectors = {'x': np.array([1, 0]),
-                            'y': np.array([0, 1]),
-                            'lh': np.array([1j, 1]),
-                            'rh': np.array([-1j, 1])}
 
     def __init__(self, exciton_obj):
         """
