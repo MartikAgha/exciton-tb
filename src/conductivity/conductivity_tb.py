@@ -10,6 +10,7 @@ e_charge_2_over_epsilon0 = 180.79096
 
 class ConductivityTB:
 
+    reach_multiplier = 10
     polarisation_vectors = {'x': np.array([1, 0]),
                             'y': np.array([0, 1]),
                             'lh': np.array([1j, 1]),
@@ -72,27 +73,29 @@ class ConductivityTB:
         broad_fnc = get_broadening_function(broadening, sigma)
 
         frequency_grid = np.linspace(*freq_range)
-        output_grid = np.zeros(len(frequency_grid))
+        energy_increment = np.abs(frequency_grid[1] - frequency_grid[0])
+        num_freqs, min_freq = len(frequency_grid), min(frequency_grid)
+        output_grid = np.zeros(num_freqs)
 
         energy_power = 1 + int(dielectric_function)
         prefactor = e_charge_2_over_epsilon0 if dielectric_function else 1
         prefactor = prefactor/system_area
 
         n_shift = self.n_spins*self.n_orbs
-        for idx_1, kpt in enumerate(self.k_grid):
+        for idx1, kpt in enumerate(self.k_grid):
             for s0 in range(2):
                 if self.n_spins == 1 and s0 == 1:
                     continue
-                velocity_matrix = self.load_velocity_matrix(idx_1, s0)
+                velocity_matrix = self.load_velocity_matrix(idx1, s0)
                 bands = self.exciton_obj.get_number_conduction_valence_bands(
-                    idx_1, s0
+                    idx1, s0
                 )
                 v_num, c_num = bands
                 eigvals = np.array(
-                    self.file_storage['eigensystem']['eigenvalues'][idx_1]
+                    self.file_storage['eigensystem']['eigenvalues'][idx1]
                 )
 
-                j1, j2 = n_shift*idx_1, n_shift*(idx_1 + 1)
+                j1, j2 = n_shift*idx1, n_shift*(idx1 + 1)
                 eigvecs = np.array(
                     self.file_storage['eigensystem']['eigenvectors'][j1:j2, :]
                 )
@@ -100,16 +103,25 @@ class ConductivityTB:
                     cb_vector = eigvecs[:, v_num + c]
                     vb_vector = eigvecs[:, v_num]
                     vb_energy, cb_energy = eigvals[v_num + c], eigvals[v_num]
+                    energy_diff = (cb_energy - vb_energy)
+
+                    energy_diff_pow = energy_diff**energy_power
                     matrix_elem = velocity_matrix_element(vb_vector,
                                                           cb_vector,
                                                           velocity_matrix)
 
-                    for idx_2, omega in enumerate(frequency_grid):
-                        energy_diff = (cb_energy - vb_energy)**energy_power
-                        smearing = broad_fnc(energy_diff, omega)
-                        main_term = np.abs(matrix_elem)**2/energy_diff
+                    main_term = np.abs(matrix_elem)**2/energy_diff_pow
+
+                    closest_idx = (energy_diff - min_freq)//energy_increment
+                    idx_reach = self.reach_multiplier*(sigma//energy_increment)
+
+                    lower_idx = max([closest_idx - idx_reach, 0])
+                    upper_idx = min([closest_idx + idx_reach, num_freqs - 1])
+
+                    for idx2 in range(int(lower_idx), int(upper_idx)):
+                        smearing = broad_fnc(energy_diff, frequency_grid[idx2])
                         output = prefactor*main_term*smearing
-                        output_grid[idx_2] += output
+                        output_grid[idx2] += output
 
         return output_grid
 
