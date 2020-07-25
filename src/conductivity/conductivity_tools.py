@@ -22,5 +22,5 @@ def lorentz(w, w0, sigma):
 
 def velocity_matrix_element(vb_vector, cb_vector, velocity_matrix):
 	matrix_element_vb = np.dot(velocity_matrix, vb_vector)
-	matrix_element = np.abs(np.dot(np.conj(cb_vector), matrix_element_vb))**2
+	matrix_element = np.dot(np.conj(cb_vector), matrix_element_vb)
 	return matrix_element
