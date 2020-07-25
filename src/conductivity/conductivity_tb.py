@@ -153,7 +153,8 @@ class ConductivityTB:
                     idx_1, s0
                 )
                 v_num, c_num = bands
-                j1, j2 = n_shift*idx_1, n_shift*(idx_1 + 1)
+                j1 = n_shift*idx_1 + s0*self.n_orbs
+                j2 = j1 + s0*self.n_orbs
                 eigvecs = np.array(
                     self.file_storage['eigensystem']['eigenvectors'][j1:j2, :]
                 )
