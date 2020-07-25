@@ -85,9 +85,13 @@ class ExcitonTB:
 
         self.selective_mode = bool(np.array(self.file_storage['selective']))
         if self.selective_mode:
-            self.num_states = int(np.array(
+            num_states = np.array(
                 self.file_storage['band_edges']['num_states']
-            ))
+            )
+            try:
+                self.num_states = int(num_states)
+            except TypeError:
+                self.num_states = list(num_states)
 
         if not os.path.exists(self.matrix_element_dir):
             os.mkdir(self.matrix_element_dir)
@@ -116,8 +120,7 @@ class ExcitonTB:
             f['VkM'] = eh_int
             nk_shift = nk if nk == 1 else 2*nk
 
-            num_states = self.num_states if self.selective_mode else norb
-            state_shift = num_states if self.n_spins == 1 else 2*num_states
+            state_shift = norb if self.n_spins == 1 else 2*norb
 
             for s0 in range(2):
                 if self.n_spins == 1 and s0 == 1:
@@ -152,7 +155,7 @@ class ExcitonTB:
                         m_shf, l_shf = ki_m*state_shift, ki_l*state_shift
                         id_string = self.four_point_str % (m1, m2, l1, l2)
                         kpts = spins.create_group(id_string)
-                        e_m, e_l = m_shf + s0*num_states, l_shf + s0*num_states
+                        e_m, e_l = m_shf + s0*norb, l_shf + s0*norb
 
                         vb_iter = product(range(v_num_m), range(v_num_l))
                         for v1, v2 in vb_iter:
@@ -160,8 +163,8 @@ class ExcitonTB:
                             # This is reversed compared to conduction band
                             vm_i = v2*v_num_m + v1
                             valence[:, vm_i] = reduced_tb_vec(
-                                eigvecs[e_l:e_l + num_states, v2],
-                                eigvecs[e_m:e_m + num_states, v1],
+                                eigvecs[e_l:e_l + norb, v2],
+                                eigvecs[e_m:e_m + norb, v1],
                                 nat,
                                 self.cumulative_positions
                             )
@@ -215,22 +218,19 @@ class ExcitonTB:
 
         for m1, m2 in product(range(nk), range(nk)):
             k_i = nk*m1 + m2
-
-
             # Diagonal elements: Use cb/vb energy differences
             energy_k, energy_kq = self.get_diag_eigvals(k_idx=k_i,
                                                         kq_idx=k_i,
                                                         q_crys=q_zero,
                                                         direct=True)
-
             for s0 in range(2):
                 if self.n_spins == 1 and s0 == 1:
                     continue
                 k_skip = blocks[s0][k_i] if selective else k_i*block_skip
-                spin_skip = s0*self.num_states if selective else s0*spin_shift
                 vnum1, cnum1 = self.get_number_conduction_valence_bands(
                     k_i, s0
                 )
+                spin_skip = s0*(vnum1 + cnum1) if selective else s0*spin_shift
 
                 for c, v in product(range(cnum1), range(vnum1)):
                     mat_idx = k_skip + c*vnum1 + v
@@ -403,29 +403,35 @@ class ExcitonTB:
         valcon = n_val*n_con
         mat_dim = [valcon*nk2]*self.n_spins
         block_starts, cumul_position, cumul_position_split = None, 0, [0, 0]
-        # Make cumulative positions of elements in matrix to navigate
+        # Make cumulative positions of elements in matrix to navigate through
+        # bse matrix with kpoint blocks that have different number of bands
 
         one_point_str = self.one_point_str
         if self.selective_mode:
-            blocks = []
-            blocks_split = [[], []]
-            for idx in range(len(self.k_grid)):
-                v_num = list(f['band_edges'][one_point_str % idx]['vb_num'])
-                c_num = list(f['band_edges'][one_point_str % idx]['cb_num'])
-
-                for s0 in range(2):
-                    if not self.n_spins == 1:
-                        blocks_split[s0].append(cumul_position_split[s0])
-                        cumul_position_split[s0] += v_num[s0]*c_num[s0]
-                    else:
-                        blocks.append(cumul_position)
-                        cumul_position += v_num[s0]*c_num[s0]
-
-            if not self.n_spins == 1:
-                mat_dim = cumul_position_split
-                block_starts = blocks_split
+            if self.n_spins == 1:
+                blocks = []
+                for idx in range(len(self.k_grid)):
+                    v_num_h5 = f['band_edges'][one_point_str % idx]['vb_num']
+                    c_num_h5 = f['band_edges'][one_point_str % idx]['cb_num']
+                    v_num = int(np.array(v_num_h5))
+                    c_num = int(np.array(c_num_h5))
+                    blocks.append(cumul_position)
+                    cumul_position += v_num*c_num
+                # No spin-split system
+                mat_dim = [cumul_position]
+                block_starts = [blocks]
             else:
-                mat_dim = cumul_position
+                blocks = [[], []]
+                for idx in range(len(self.k_grid)):
+                    v_num_h5 = f['band_edges'][one_point_str % idx]['vb_num']
+                    c_num_h5 = f['band_edges'][one_point_str % idx]['cb_num']
+                    v_num = list(np.array(v_num_h5))
+                    c_num = list(np.array(c_num_h5))
+                    for s0 in range(2):
+                        blocks[s0].append(cumul_position_split[s0])
+                        cumul_position_split[s0] += v_num[s0]*c_num[s0]
+
+                mat_dim = cumul_position_split
                 block_starts = blocks
 
         return mat_dim, block_starts
