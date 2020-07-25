@@ -37,18 +37,6 @@ class ConductivityTB:
             vel_mat = np.array(self.file_storage['velocity_matrix'][k_idx][s0])
         return vel_mat
 
-    def convert_str_to_polarisation(self, string):
-        """
-        Convert polarisation tag to a vector of light polarisation.
-        :param string: polarisation tag
-        :return: polarisation_vector
-        """
-        try:
-            polarisation_vector = self.polarisation_vectors[string]
-        except KeyError:
-            polarisation_vector = self.polarisation_vectors['x']
-        return polarisation_vector
-
     def non_interacting_conductivity(self,
                                      sigma=0.04,
                                      freq_range=(0.0, 6.0, 1000),
