@@ -40,7 +40,7 @@ class ConductivityTB:
     def non_interacting_conductivity(self,
                                      sigma=0.04,
                                      freq_range=(0.0, 6.0, 1000),
-                                     dielectric_function=False,
+                                     imag_dielectric=False,
                                      broadening='lorentz'):
         """
         Calculate the optical conductivity in the absence of electron-hole
@@ -48,7 +48,7 @@ class ConductivityTB:
         :param sigma: Phenomenological broadening given to the conductivity.
         :param freq_range: tuple (freq_start, freq_finish, freq_number) as
                            used for numpy.linspace()
-        :param dielectric_function: Set to True to calculate the imaginary
+        :param imag_dielectric: Set to True to calculate the imaginary
                                     part of the dielectric function.
         :param broadening: type of broadening (e.g. 'lorentz', 'gauss')
         :return:
@@ -61,8 +61,8 @@ class ConductivityTB:
         num_freqs, min_freq = len(frequency_grid), min(frequency_grid)
         output_grid = np.zeros(num_freqs)
 
-        energy_power = 1 + int(dielectric_function)
-        prefactor = e_charge_2_over_epsilon0 if dielectric_function else 1
+        energy_power = 1 + int(imag_dielectric)
+        prefactor = e_charge_2_over_epsilon0 if imag_dielectric else 1
         prefactor = prefactor/system_area
 
         n_shift = self.n_spins*self.n_orbs
@@ -112,7 +112,7 @@ class ConductivityTB:
     def interacting_conductivity(self,
                                  sigma=0.04,
                                  freq_range=(0.0, 6.0, 1000),
-                                 dielectric_function=False,
+                                 imag_dielectric=False,
                                  broadening='lorentz'):
         """
         Calculate the optical conductivity in the with electron-hole
@@ -120,7 +120,7 @@ class ConductivityTB:
         :param sigma: Phenomenological broadening given to the conductivity.
         :param freq_range: tuple (freq_start, freq_finish, freq_number) as
                            used for numpy.linspace()
-        :param dielectric_function: Set to True to calculate the imaginary
+        :param imag_dielectric: Set to True to calculate the imaginary
                                     part of the dielectric function.
         :param broadening: type of broadening (e.g. 'lorentz', 'gauss')
         :return:
@@ -131,8 +131,8 @@ class ConductivityTB:
         frequency_grid = np.linspace(*freq_range)
         output_grid = np.zeros(len(frequency_grid))
 
-        energy_power = 1 + int(dielectric_function)
-        prefactor = e_charge_2_over_epsilon0 if dielectric_function else 1
+        energy_power = 1 + int(imag_dielectric)
+        prefactor = e_charge_2_over_epsilon0 if imag_dielectric else 1
         prefactor = prefactor/system_area
 
         n_shift = self.n_spins*self.n_orbs
