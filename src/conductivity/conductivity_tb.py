@@ -56,7 +56,7 @@ class ConductivityTB:
         :param broadening: type of broadening (e.g. 'lorentz', 'gauss')
         :return:
         """
-        system_area = np.abs(np.cross(self.a1, self.a2)[2])*len(self.k_grid)
+        cell_area = np.abs(float(np.cross(self.a1, self.a2)))*len(self.k_grid)
         broad_fnc = get_broadening_function(broadening, sigma)
 
         frequency_grid = np.linspace(*freq_range)
@@ -66,7 +66,7 @@ class ConductivityTB:
 
         energy_power = 1 + int(imag_dielectric)
         prefactor = e_charge_2_over_epsilon0 if imag_dielectric else 1
-        prefactor = prefactor/system_area
+        prefactor = prefactor/cell_area
 
         n_shift = self.n_spins*self.n_orbs
         for idx1, kpt in enumerate(self.k_grid):
@@ -88,8 +88,8 @@ class ConductivityTB:
                 )
                 for v, c in product(range(v_num), range(c_num)):
                     cb_vector = eigvecs[:, v_num + c]
-                    vb_vector = eigvecs[:, v_num]
-                    vb_energy, cb_energy = eigvals[v_num + c], eigvals[v_num]
+                    vb_vector = eigvecs[:, v]
+                    cb_energy, vb_energy = eigvals[v_num + c], eigvals[v]
                     energy_diff = (cb_energy - vb_energy)
 
                     energy_diff_pow = energy_diff**energy_power
@@ -98,7 +98,6 @@ class ConductivityTB:
                                                           velocity_matrix)
 
                     main_term = np.abs(matrix_elem)**2/energy_diff_pow
-
                     closest_idx = (energy_diff - min_freq)//energy_increment
                     idx_reach = self.reach_multiplier*(sigma//energy_increment)
 
@@ -110,7 +109,7 @@ class ConductivityTB:
                         output = prefactor*main_term*smearing
                         output_grid[idx2] += output
 
-        return output_grid
+        return frequency_grid, output_grid
 
     def interacting_conductivity(self,
                                  sigma=0.04,
@@ -178,5 +177,5 @@ class ConductivityTB:
                 output = prefactor*main_term*smearing
                 output_grid[idx_2] += output
 
-        return output_grid
+        return frequency_grid, output_grid
 

@@ -68,9 +68,9 @@ class ExcitonTB:
         self.n_spins = int(np.array(self.file_storage['eigensystem']['n_spins']))
         if not self.n_spins in [1, 2]:
             raise Exception("eigensystem/n_spins must be either 1 or 2.")
-        self.is_complex = bool(int(np.array(
+        self.is_complex = bool(np.array(
             self.file_storage['eigensystem']['is_complex']
-        )))
+        ))
 
         # Acrue real-space and reciprocal-space grid.
         self.k_grid = np.array(self.file_storage['eigensystem']['k_grid'])
