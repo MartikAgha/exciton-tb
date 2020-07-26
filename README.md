@@ -48,17 +48,47 @@ Resource for h5py usage: http://docs.h5py.org/en/stable/
 
 'eigensystem': eigenvalue and eigenvector data
 
-        - 'eigenvalues'
+        - 'eigenvalues': Eigenvalues for each k point. Eigenvalues from the
+                         same k point should exist in the same row in
+                         numerical order, such that the shape of 'eigenvalues'
+                         is (n_kpoints, n_states). If the eigensystem is
+                         divided by spin (a spin-separable hamiltonian), then
+                         the order of eigenvalues should have increasingly
+                         ordered spin down eigenvalues first followed by
+                         increasingly ordered spin up eigenvalues.
 
-        - 'eigenvectors'
+        - 'eigenvectors': Eigenvectors for each k point. Eigenvectors from
+                          the same k-point should be in a block of size
+                          (eigenvector_length, n_states), and these should be
+                          stacked row-wise for different k points, such that
+                          'eigenvectors' is of size
+                          (n_kpoints*eigenvector_length, n_states). Note if
+                          different k points have different numbers of states
+                          associated with them, then the number of columns
+                          should be the largest number of states at a single
+                          k point, and for k points with less states, the
+                          latter states should appear as zeros on the
+                          right-most columns.
+
+        - 'eigenvectors_real': Real part of the eigenvectors, see
+                               'eigenvectors' for structural information
+
+        - 'eigenvectors_imag': Imaginary part of the eigenvectors, see
+                               'eigenvectors' for structural information
+
+        - 'is_complex': True to treat the 'eigenvectors' as complex entities,
+                        otherwise, set this to False and specify
+                        'eigenvectors_real' and 'eigenvectors_imag'
 
         - 'k_grid': list of reciprocal vectors that are used for the calculations
 
         - 'n_k': size of kgrid i.e. the grid will be nk times nk
 
-        - 'n_con': number of conduction band states
+        - 'n_con': number of conduction band states.
+                   (Not needed if 'selective' is True)
 
         - 'n_val': number of valence band states
+                   (Not needed if 'selective' is True)
 
 'selective': The number of bands to be used in the system are limited to avoid
 using all transitions when calculating the excitons, and instead to use a
