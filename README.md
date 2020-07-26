@@ -48,6 +48,12 @@ Resource for h5py usage: http://docs.h5py.org/en/stable/
 
 'eigensystem': eigenvalue and eigenvector data
 
+        - 'n_spins': Set to 1 if spin is either unpresent in the calculation,
+                     or if the hamiltonian cannot be split into separable
+                     blocks corresponding to different spins. Set to 2 if the
+                     eigenvectors for different spins are calculated separately
+                     and can be placed in eigenvectors as blocks half the size.
+
         - 'eigenvalues': Eigenvalues for each k point. Eigenvalues from the
                          same k point should exist in the same row in
                          numerical order, such that the shape of 'eigenvalues'
@@ -98,7 +104,9 @@ limited subset of bands. set to True or False.
 
     - 'num_states': number of states included in each eigensystem
 
-    - 'k(idx)' idx of the kpt in the k_grid:
+    - 'k(idx)' idx of the kpt in the k_grid. (Note if n_spins is 2, and we
+                wish to treat the spins separately, the values of 'vb_num'
+                and 'cb_num' will be a list of 2 values for each spin)
 
             - 'vb_num': number of valence bands
 
