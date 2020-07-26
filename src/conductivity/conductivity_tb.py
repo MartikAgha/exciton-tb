@@ -11,6 +11,7 @@ e_charge_2_over_epsilon0 = 180.79096
 
 class ConductivityTB:
 
+    kpt_str = 'k(%d)'
     reach_multiplier = 10
 
     def __init__(self, exciton_obj=None):
@@ -32,10 +33,11 @@ class ConductivityTB:
         :param s0: spin index if spin-divided (i.e. n_spins == 2)
         :return: velocity_matrix
         """
+        k_str = self.kpt_str % k_idx
         if self.n_spins == 1:
-            vel_mat = np.array(self.file_storage['velocity_matrix'][k_idx])
+            vel_mat = np.array(self.file_storage['velocity_matrix'][k_str])
         else:
-            vel_mat = np.array(self.file_storage['velocity_matrix'][k_idx][s0])
+            vel_mat = np.array(self.file_storage['velocity_matrix'][k_str][s0])
         return vel_mat
 
     def non_interacting_conductivity(self,

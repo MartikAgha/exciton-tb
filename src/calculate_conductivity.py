@@ -48,16 +48,17 @@ def main():
 
     exc_tb.terminate_storage_usage()
 
-    if args.terminal_output:
-        write_obj = sys.stdout
-        write_conductivity(frequencies=frequencies,
-                           conductivity=conductivity,
-                           write_obj=write_obj)
-    else:
-        with open(args.output_name, 'w') as write_obj:
-            write_conductivity(frequencies=frequencies,
-                               conductivity=conductivity,
-                               write_obj=write_obj)
+    print(frequencies, conductivity)
+    # if args.terminal_output:
+    #     write_obj = sys.stdout
+    #     write_conductivity(frequencies=frequencies,
+    #                        conductivity=conductivity,
+    #                        write_obj=write_obj)
+    # else:
+    #     with open(args.output_name, 'w') as write_obj:
+    #         write_conductivity(frequencies=frequencies,
+    #                            conductivity=conductivity,
+    #                            write_obj=write_obj)
 
 if __name__ == '__main__':
     main()
