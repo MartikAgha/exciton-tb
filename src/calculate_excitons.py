@@ -36,24 +36,26 @@ def main():
     exc_tb.create_matrix_element_hdf5(storage_name=args.matrix_element)
     output = exc_tb.get_bse_eigensystem_direct(solve=True)
     exc_tb.terminate_storage_usage()
+
+    split = bool(exc_tb.n_spins == 2)
     if args.exciton_dos:
         output = extract_exciton_dos(excitons=output,
                                      frequencies=freq_range,
                                      broadening_function=args.broadening,
                                      sigma=args.broadening_width,
-                                     spin_split=bool(exc_tb.n_spins == 2))
+                                     spin_split=split)
     if args.terminal_output:
         write_obj = sys.stdout
         if args.exciton_dos:
-            write_exciton_dos(output, write_obj=write_obj)
+            write_exciton_dos(output, freq_range, write_obj=write_obj)
         else:
-            write_excitons(output, write_obj=write_obj)
+            write_excitons(output, write_obj=write_obj, spin_split=split)
     else:
         with open(args.output_name, 'w') as write_obj:
             if args.exciton_dos:
-                write_exciton_dos(output, write_obj=write_obj)
+                write_exciton_dos(output, freq_range, write_obj=write_obj)
             else:
-                write_excitons(output, write_obj=write_obj)
+                write_excitons(output, write_obj=write_obj, spin_split=split)
 
 
 if __name__ == '__main__':
