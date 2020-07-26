@@ -4,9 +4,9 @@ import numpy as np
 
 
 def get_broadening_function(fnc_name, sigma):
-	if fnc_name is 'lorentz':
+	if fnc_name == 'lorentz':
 		fnc = partial(lorentz, sigma=sigma)
-	elif fnc_name is 'gauss':
+	elif fnc_name == 'gauss':
 		fnc = partial(gauss, sigma=sigma)
 	else:
 		raise Exception('Function name not available')

@@ -3,7 +3,7 @@ import argparse
 
 from exciton_tb.exciton_tb import ExcitonTB
 from conductivity.conductivity_tb import ConductivityTB
-# from util.writers import write_conductivity
+from util.writers import write_conductivity
 
 
 def get_argparser():
@@ -19,9 +19,10 @@ def get_argparser():
     parser.add_argument('-fmax', '--frequency-max', default=6.0, type=float)
     parser.add_argument('-fnum', '--frequency-num', default=1000, type=int)
     parser.add_argument('-d', '--dielectric', action='store_true')
-    parser.add_argument('-b', '--broadening', defaurlt='lorentz', type=str)
+    parser.add_argument('-b', '--broadening', default='lorentz', type=str)
     parser.add_argument('-mn', '--matrix-element', default='temp_elem.hdf5')
     return parser
+
 
 def main():
     parser = get_argparser()
@@ -35,30 +36,38 @@ def main():
 
     exc_tb = ExcitonTB(args.input_hdf5)
 
-    if not args.use_rpa:
+    if args.use_rpa:
+        cond_tb = ConductivityTB(exciton_obj=exc_tb)
+        frequencies, conductivity = cond_tb.non_interacting_conductivity(
+            sigma=args.broadening_width,
+            freq_range=freq_range,
+            imag_dielectric=args.dielectric,
+            broadening=args.broadening
+        )
+    else:
         exc_tb.create_matrix_element_hdf5(args.matrix_element)
-
-    cond_tb = ConductivityTB(exciton_obj=exc_tb)
-    frequencies, conductivity = cond_tb.interacting_conductivity(
-        sigma=args.broadening_width,
-        freq_range=freq_range,
-        imag_dielectric=args.dielectric,
-        broadening=args.broadening
-    )
-
+        cond_tb = ConductivityTB(exciton_obj=exc_tb)
+        frequencies, conductivity = cond_tb.interacting_conductivity(
+            sigma=args.broadening_width,
+            freq_range=freq_range,
+            imag_dielectric=args.dielectric,
+            broadening=args.broadening
+        )
     exc_tb.terminate_storage_usage()
 
-    print(frequencies, conductivity)
-    # if args.terminal_output:
-    #     write_obj = sys.stdout
-    #     write_conductivity(frequencies=frequencies,
-    #                        conductivity=conductivity,
-    #                        write_obj=write_obj)
-    # else:
-    #     with open(args.output_name, 'w') as write_obj:
-    #         write_conductivity(frequencies=frequencies,
-    #                            conductivity=conductivity,
-    #                            write_obj=write_obj)
+    if args.terminal_output:
+        write_obj = sys.stdout
+        write_conductivity(frequencies=frequencies,
+                           conductivity=conductivity,
+                           write_obj=write_obj,
+                           is_interacting=bool(not args.use_rpa))
+    else:
+        with open(args.output_name, 'w') as write_obj:
+            write_conductivity(frequencies=frequencies,
+                               conductivity=conductivity,
+                               write_obj=write_obj,
+                               is_interacting=bool(not args.use_rpa))
+
 
 if __name__ == '__main__':
     main()

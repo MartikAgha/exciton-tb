@@ -127,7 +127,7 @@ class ConductivityTB:
         :param broadening: type of broadening (e.g. 'lorentz', 'gauss')
         :return:
         """
-        system_area = np.abs(np.cross(self.a1, self.a2)[2])*len(self.k_grid)
+        cell_area = np.abs(np.cross(self.a1, self.a2))*len(self.k_grid)
         broad_fnc = get_broadening_function(broadening, sigma)
 
         frequency_grid = np.linspace(*freq_range)
@@ -135,7 +135,7 @@ class ConductivityTB:
 
         energy_power = 1 + int(imag_dielectric)
         prefactor = e_charge_2_over_epsilon0 if imag_dielectric else 1
-        prefactor = prefactor/system_area
+        prefactor = prefactor/cell_area
 
         n_shift = self.n_spins*self.n_orbs
 
@@ -152,7 +152,7 @@ class ConductivityTB:
                 )
                 v_num, c_num = bands
                 j1 = n_shift*idx_1 + s0*self.n_orbs
-                j2 = j1 + s0*self.n_orbs
+                j2 = j1 + n_shift - (1 - s0)*self.n_orbs*(self.n_spins - 1)
                 eigvecs = np.array(
                     self.file_storage['eigensystem']['eigenvectors'][j1:j2, :]
                 )
@@ -166,16 +166,19 @@ class ConductivityTB:
 
         velocity_elements = np.array(velocity_elements, dtype=complex)
         bse_eigsys = self.exciton_obj.get_bse_eigensystem_direct(solve=True)
-        for idx_1 in range(len(bse_eigsys)):
-            bse_vector = bse_eigsys[1][:, idx_1]
-            bse_value = bse_eigsys[0][idx_1]
-            energy_denominator = bse_value**energy_power
-            interacting_mat_elem = np.dot(bse_vector, velocity_elements)
-            for idx_2, omega in enumerate(frequency_grid):
-                smearing = broad_fnc(bse_value, omega)
-                main_term = np.abs(interacting_mat_elem)**2/energy_denominator
-                output = prefactor*main_term*smearing
-                output_grid[idx_2] += output
+        for s0 in range(self.n_spins):
+            if self.n_spins == 1 and s0 == 1:
+                continue
+            for idx_1 in range(len(bse_eigsys[s0][0])):
+                bse_vector = bse_eigsys[s0][1][:, idx_1]
+                bse_value = bse_eigsys[s0][0][idx_1]
+                energy_denominator = bse_value**energy_power
+                interacting_elem = np.dot(bse_vector, velocity_elements)
+                for idx_2, omega in enumerate(frequency_grid):
+                    smearing = broad_fnc(bse_value, omega)
+                    main_term = np.abs(interacting_elem)**2/energy_denominator
+                    output = prefactor*main_term*smearing
+                    output_grid[idx_2] += output
 
         return frequency_grid, output_grid
 
