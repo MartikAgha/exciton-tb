@@ -4,6 +4,7 @@ import numpy as np
 import scipy as sp
 
 recentering_precision = 1e-7
+reach_factor = 10
 
 def get_complex_zeros(square_dimension):
     return sp.zeros((square_dimension, square_dimension), dtype=complex)
@@ -94,3 +95,37 @@ def get_band_extrema(eigensystem, energy_limit, cell_size):
     vb_min_2 = list(eigensystem[1][0] >= min_energy_2).index(True)
 
     return cb_max_1, cb_max_2, vb_min_1, vb_min_2
+
+def extract_exciton_dos(excitons,
+                        frequencies,
+                        broadening_function,
+                        sigma,
+                        spin_split=False):
+    """
+    Get the excitonic density of states given a frequency grid and broadening
+    function.
+    :param excitons: excitonic eigensystem
+    :param frequencies: grid of frequencies
+    :param broadening_fnc: broadening function (should take only w and w0)
+    :param sigma: Broadening used for the broadening function
+    :param spin_split: Set to True to loop over spin in the exciton data.
+    :return:
+    """
+    frequency_incr = frequencies[1] - frequencies[0]
+    density_of_states = np.zeros(len(frequencies))
+
+    for s0 in range(2):
+        if not spin_split and s0 == 1:
+            continue
+        for idx1, exciton in enumerate(excitons[s0][0]):
+            closest_idx = int((exciton - min(frequencies))//frequency_incr)
+            reach_idx = reach_factor*int(sigma//frequency_incr)
+            lower_idx = max([closest_idx - reach_idx, 0])
+            upper_idx = min([closest_idx + reach_idx, len(frequencies) - 1])
+            for idx2 in range(lower_idx, upper_idx):
+                smearing = broadening_function(exciton, frequencies[idx2])
+                density_of_states[idx2] += smearing
+    return density_of_states
+
+
+
