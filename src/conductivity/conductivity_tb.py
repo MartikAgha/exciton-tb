@@ -1,6 +1,7 @@
 from itertools import product
 
 import numpy as np
+import h5py as hp
 
 from .conductivity_tools import velocity_matrix_element, \
                                 get_broadening_function
@@ -12,10 +13,10 @@ class ConductivityTB:
 
     reach_multiplier = 10
 
-    def __init__(self, exciton_obj):
+    def __init__(self, exciton_obj=None):
         """
         Optical conductivity calculator for tight-binding models
-        :param hdf5_input: Input from the tight-binding model in hdf5 format.
+        :param exciton_obj ExcitonTB object (with matrix_element created)
         """
         self.exciton_obj = exciton_obj
         self.file_storage = exciton_obj.file_storage

@@ -1,8 +1,5 @@
-import os
 import sys
 import argparse
-
-import numpy as np
 
 from exciton_tb.exciton_tb import ExcitonTB
 from conductivity.conductivity_tb import ConductivityTB
@@ -35,24 +32,21 @@ def main():
                          or use terminal output (-t)!")
 
     freq_range = (args.frequency_min, args.frequency_max, args.frequency_num)
-    if args.use_rpa:
-        exc_tb = ExcitonTB(args.input_hdf5)
+
+    exc_tb = ExcitonTB(args.input_hdf5)
+
+    if not args.use_rpa:
         exc_tb.create_matrix_element_hdf5(args.matrix_element)
-        cond_tb = ConductivityTB(exciton_obj=exc_tb)
-        frequencies, conductivity = cond_tb.interacting_conductivity(
-            sigma=args.broadening_width,
-            freq_range=freq_range,
-            imag_dielectric=args.dielectric,
-            broadening=args.broadening
-        )
-    else:
-        cond_tb = ConductivityTB(input_hdf5=args.input_hdf5)
-        frequencies, conductivity = cond_tb.non_interacting_conductivity(
-            sigma=args.broadening_width,
-            freq_range=freq_range,
-            imag_dielectric=args.dielectric,
-            broadening=args.broadening
-        )
+
+    cond_tb = ConductivityTB(exciton_obj=exc_tb)
+    frequencies, conductivity = cond_tb.interacting_conductivity(
+        sigma=args.broadening_width,
+        freq_range=freq_range,
+        imag_dielectric=args.dielectric,
+        broadening=args.broadening
+    )
+
+    exc_tb.terminate_storage_usage()
 
     if args.terminal_output:
         write_obj = sys.stdout
