@@ -68,6 +68,9 @@ class ExcitonTB:
         self.n_spins = int(np.array(self.file_storage['eigensystem']['n_spins']))
         if not self.n_spins in [1, 2]:
             raise Exception("eigensystem/n_spins must be either 1 or 2.")
+        self.is_complex = bool(int(np.array(
+            self.file_storage['eigensystem']['is_complex']
+        )))
 
         # Acrue real-space and reciprocal-space grid.
         self.k_grid = np.array(self.file_storage['eigensystem']['k_grid'])
@@ -115,7 +118,7 @@ class ExcitonTB:
         pos_list = self.r_grid
 
         with hp.File(self.element_storage_name, 'w') as f:
-            eigvecs = np.array(self.file_storage['eigensystem']['eigenvectors'])
+            eigvecs = self.get_preprocessed_eigenvectors()
             eh_int = self.get_eh_int(nat, nk, pos_list)
             f['VkM'] = eh_int
             nk_shift = nk if nk == 1 else 2*nk
@@ -501,7 +504,7 @@ class ExcitonTB:
         eigcopy = np.array(eigvecs)
         valcon = self.n_val + self.n_con
         for idx in range(len(self.k_grid)):
-            k_shift = idx*state_shift
+            k_shift = idx*self.n_orbs
             if self.n_spins == 1:
                 bandnum = self.get_number_conduction_valence_bands(idx, 0)
                 for jdx in range(bandnum[0] + bandnum[1]):
@@ -510,4 +513,19 @@ class ExcitonTB:
 
         return eigcopy
 
+    def get_preprocessed_eigenvectors(self):
+        """
+        Combine real and imaginary parts of eigenvectors into an array,
+        if not complex.
+        :param eigenvectors:
+        :return:
+        """
+        f = self.file_storage
+        if self.is_complex:
+            eigenvectors = np.array(f['eigensystem']['eigenvectors'])
+        else:
+            eigvecs_real = np.array(f['eigensystem']['eigenvectors_real'])
+            eigvecs_imag = np.array(f['eigensystem']['eigenvectors_imag'])
+            eigenvectors = eigvecs_real + 1j*eigvecs_imag
+        return eigenvectors
 
