@@ -1,7 +1,6 @@
 from itertools import product
 
 import numpy as np
-import h5py as hp
 
 from .conductivity_tools import velocity_matrix_element, \
                                 get_broadening_function
@@ -26,7 +25,7 @@ class ConductivityTB:
         self.n_spins = exciton_obj.n_spins
         self.n_orbs = exciton_obj.n_orbs
 
-    def load_velocity_matrix(self, k_idx, s0):
+    def load_velocity_matrix(self, k_idx):
         """
         Load velocity matrix for a specific k_points (and potentially spin).
         :param k_idx: idx of the k-point with respect to self.k_grid
@@ -34,10 +33,7 @@ class ConductivityTB:
         :return: velocity_matrix
         """
         k_str = self.kpt_str % k_idx
-        if self.n_spins == 1:
-            vel_mat = np.array(self.file_storage['velocity_matrix'][k_str])
-        else:
-            vel_mat = np.array(self.file_storage['velocity_matrix'][k_str][s0])
+        vel_mat = np.array(self.file_storage['velocity_matrix'][k_str])
         return vel_mat
 
     def non_interacting_conductivity(self,
@@ -73,7 +69,7 @@ class ConductivityTB:
             for s0 in range(2):
                 if self.n_spins == 1 and s0 == 1:
                     continue
-                velocity_matrix = self.load_velocity_matrix(idx1, s0)
+                velocity_matrix = self.load_velocity_matrix(idx1)
                 bands = self.exciton_obj.get_number_conduction_valence_bands(
                     idx1, s0
                 )
@@ -82,7 +78,8 @@ class ConductivityTB:
                     self.file_storage['eigensystem']['eigenvalues'][idx1]
                 )
 
-                j1, j2 = n_shift*idx1, n_shift*(idx1 + 1)
+                j1 = n_shift*idx1 + (self.n_spins - 1)*s0*self.n_orbs
+                j2 = j1 + self.n_orbs
                 eigvecs = np.array(
                     self.file_storage['eigensystem']['eigenvectors'][j1:j2, :]
                 )
@@ -141,12 +138,13 @@ class ConductivityTB:
 
         # Construct vector of velocity matrix elements to dot with the
         # bse eigenvector.
-        velocity_elements = []
-        for idx_1, kpt in enumerate(self.k_grid):
-            for s0 in range(2):
-                if self.n_spins == 1 and s0 == 1:
-                    continue
-                velocity_matrix = self.load_velocity_matrix(idx_1, s0)
+        velocity_element_lists = []
+        for s0 in range(2):
+            if self.n_spins == 1 and s0 == 1:
+                continue
+            velocity_elements = []
+            for idx_1, kpt in enumerate(self.k_grid):
+                velocity_matrix = self.load_velocity_matrix(idx_1)
                 bands = self.exciton_obj.get_number_conduction_valence_bands(
                     idx_1, s0
                 )
@@ -158,13 +156,14 @@ class ConductivityTB:
                 )
                 for c, v in product(range(c_num), range(v_num)):
                     cb_vector = eigvecs[:, v_num + c]
-                    vb_vector = eigvecs[:, v_num]
-                    matrix_elem = velocity_matrix_element(vb_vector,
-                                                          cb_vector,
+                    vb_vector = eigvecs[:, v]
+                    matrix_elem = velocity_matrix_element(cb_vector,
+                                                          vb_vector,
                                                           velocity_matrix)
                     velocity_elements.append(matrix_elem)
+            velocity_elements = np.array(velocity_elements, dtype=complex)
+            velocity_element_lists.append(velocity_elements)
 
-        velocity_elements = np.array(velocity_elements, dtype=complex)
         bse_eigsys = self.exciton_obj.get_bse_eigensystem_direct(solve=True)
         for s0 in range(self.n_spins):
             if self.n_spins == 1 and s0 == 1:
@@ -173,10 +172,10 @@ class ConductivityTB:
                 bse_vector = bse_eigsys[s0][1][:, idx_1]
                 bse_value = bse_eigsys[s0][0][idx_1]
                 energy_denominator = bse_value**energy_power
-                interacting_elem = np.dot(bse_vector, velocity_elements)
+                interact_elem = np.dot(bse_vector, velocity_element_lists[s0])
                 for idx_2, omega in enumerate(frequency_grid):
                     smearing = broad_fnc(bse_value, omega)
-                    main_term = np.abs(interacting_elem)**2/energy_denominator
+                    main_term = np.abs(interact_elem)**2/energy_denominator
                     output = prefactor*main_term*smearing
                     output_grid[idx_2] += output
 
