@@ -1,4 +1,4 @@
-from itertools import product
+from itertools import product, chain
 
 import numpy as np
 import scipy as sp
@@ -126,6 +126,28 @@ def extract_exciton_dos(excitons,
                 smearing = broadening_function(exciton, frequencies[idx2])
                 density_of_states[idx2] += smearing
     return density_of_states
+
+def convert_eigenvector_convention(eigenvectors, kpt, motif, orb_pattern, nat):
+    """
+    Change eigenvectors from convention II to convention I.
+    :param eigenvectors: Matrix of eigenvectors
+    :param kpt: k point eigenvectors are calculated at
+    :param motif: list of motif vectors in order of
+    :param orbital_pattern: orbital pattern of number of orbitals per position
+    :param nat: number of atoms in the system,
+    :return:
+    """
+    phase_vector = np.exp(1j*np.dot(kpt, np.array(motif)))
+    full_pattern = [orb_pattern[i % nat] for i in range(nat)]
+    phase_nested_list = [[phase_vector[i]]*full_pattern[i] for i in range(nat)]
+    phase_array = np.array(chain(*phase_nested_list))
+
+    eigenvectors_copy = np.zeros(eigenvectors.shape)
+    for idx, row in enumerate(eigenvectors.T):
+        eigenvectors_copy[idx, :] = np.multiply(row, phase_array)
+
+    return eigenvectors_copy
+
 
 
 
