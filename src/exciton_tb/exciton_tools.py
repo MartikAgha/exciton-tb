@@ -137,16 +137,12 @@ def convert_eigenvector_convention(eigenvectors, kpt, motif, orb_pattern, nat):
     :param nat: number of atoms in the system,
     :return:
     """
-    phase_vector = np.exp(1j*np.dot(kpt, np.array(motif)))
+    phase_vector = [np.exp(1j*np.dot(kpt, vector)) for vector in motif]
     full_pattern = [orb_pattern[i % nat] for i in range(nat)]
     phase_nested_list = [[phase_vector[i]]*full_pattern[i] for i in range(nat)]
-    phase_array = np.array(chain(*phase_nested_list))
-
-    eigenvectors_copy = np.zeros(eigenvectors.shape)
-    for idx, row in enumerate(eigenvectors.T):
-        eigenvectors_copy[idx, :] = np.multiply(row, phase_array)
-
-    return eigenvectors_copy
+    phase_array = np.array(list(chain(*phase_nested_list)))
+    eigenvectors_rotate = np.multiply(phase_array.reshape(-1, 1), eigenvectors)
+    return eigenvectors_rotate
 
 
 
