@@ -99,7 +99,7 @@ class ExcitonTB:
         if not os.path.exists(self.matrix_element_dir):
             os.mkdir(self.matrix_element_dir)
 
-    def create_matrix_element_hdf5(self, storage_name, treat_phase=False):
+    def create_matrix_element_hdf5(self, storage_name):
         """
         Create matrix elements for the direct coulomb interaction
         :param storage_name: name for the hdf5 storage for matrix elements.
@@ -323,7 +323,7 @@ class ExcitonTB:
 
         if nk == 1:
             # Only need a single point to calculate the fourier transform
-            eh_int = list(sp.zeros((1, nat, nat), dtype=complex))
+            eh_int = list(np.zeros((1, nat, nat), dtype=complex))
             pos_idx = 0
             pos = pos_list[pos_idx]
             mat_term = self.create_fourier_matrix(pos=pos,
@@ -333,7 +333,7 @@ class ExcitonTB:
             eh_int[0] += mat_term
         else:
             # Considering all differences between possible k-points
-            eh_int = list(sp.zeros((4*nk2, nat, nat), dtype=complex))
+            eh_int = list(np.zeros((4*nk2, nat, nat), dtype=complex))
             for ml1, ml2 in product(range(2*nk), range(2*nk)):
                 kdiff = (ml1 - nk)*b1 + (ml2 - nk)*b2
                 for r1, r2 in product(range(nk), range(nk)):
@@ -374,7 +374,8 @@ class ExcitonTB:
             tij = self.get_vector_diff_modulo_cell(i, j)
             xij_1, xij_2 = recentre_continuous(tij, b1=self.b1, b2=self.b2)
             tij_cent = xij_1*self.a1 + xij_2*self.a2
-            radius = napla.norm(pos + tij_cent)
+            full_tij = pos + tij_cent
+            radius = napla.norm(full_tij)
         else:
             # New method (change bool to False to try this way)
             tij = self.motif_vectors[i] - self.motif_vectors[j]
@@ -391,7 +392,7 @@ class ExcitonTB:
                                              self.interaction_args,
                                              self.trunc_alat)
         if kpt is not None:
-            fourier_term *= cplx_exp_dot(kpt, pos)
+            fourier_term *= cplx_exp_dot(kpt, full_tij)
 
         return fourier_term
 
