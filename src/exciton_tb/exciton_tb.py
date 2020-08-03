@@ -36,9 +36,9 @@ class ExcitonTB:
                  cell_wise_centering=True):
         """
         Exciton calculator for tight-binding models.
-        :param hdf5_input: name of hdf5 input that contains crystal information
-                           and eigensystems
-        :param potential: type of potential used (only keldysh for now)
+        :param hdf5_input: name of hdf5 file that contains crystal information
+                           and eigensystem
+        :param potential_name: type of potential used (only keldysh for now)
         :param args: potential parameters: Dictionary containing interaction
                                            parameters
                      {'radius_0': Inherent screening value for keldysh int.,
@@ -64,10 +64,16 @@ class ExcitonTB:
         self.n_k = int(np.array(self.file_storage['eigensystem']['n_k']))
         self.n_val = int(np.array(self.file_storage['eigensystem']['n_val']))
         self.n_con = int(np.array(self.file_storage['eigensystem']['n_con']))
-        self.n_spins = int(np.array(self.file_storage['eigensystem']['n_spins']))
-        self.convention = int(np.array(self.file_storage['eigensystem']['convention']))
+        self.n_spins = int(np.array(
+            self.file_storage['eigensystem']['n_spins']
+        ))
+        self.convention = int(np.array(
+            self.file_storage['eigensystem']['convention']
+        ))
+
         if not self.n_spins in [1, 2]:
-            raise Exception("eigensystem/n_spins must be either 1 or 2.")
+            raise ValueError("eigensystem/n_spins must be either 1 or 2.")
+
         self.is_complex = bool(np.array(
             self.file_storage['eigensystem']['is_complex']
         ))
@@ -81,7 +87,9 @@ class ExcitonTB:
                                               cell_wise_centering)
 
         # Value of the position to use ear R-->0 in the interaction potential.
-        self.trunc_alat = float(np.array(self.file_storage['crystal']['trunc_alat']))
+        self.trunc_alat = float(np.array(
+            self.file_storage['crystal']['trunc_alat']
+        ))
         self.orb_pattern = list(self.file_storage['crystal']['orb_pattern'])
         self.cumulative_positions = get_cumulative_positions(self.orb_pattern,
                                                              self.n_orbs)
@@ -99,16 +107,16 @@ class ExcitonTB:
         if not os.path.exists(self.matrix_element_dir):
             os.mkdir(self.matrix_element_dir)
 
+        self.element_storage_name = None
+
     def create_matrix_element_hdf5(self, storage_name):
         """
         Create matrix elements for the direct coulomb interaction
         :param storage_name: name for the hdf5 storage for matrix elements.
-        :param treat_phase: Fix gauge of phase if
         :return:
         """
         self.element_storage_name = os.path.join(self.matrix_element_dir,
                                                  storage_name)
-        """Create store of eigenvalues, matrix elements and attributes."""
         # Acquire atomic structure parameters.
         nat = self.n_atoms
         norb = self.n_orbs
@@ -125,9 +133,7 @@ class ExcitonTB:
 
             state_shift = norb if self.n_spins == 1 else 2*norb
 
-            for s0 in range(2):
-                if self.n_spins == 1 and s0 == 1:
-                    continue
+            for s0 in range(self.n_spins):
                 # Two separate sets for up and down spin for non-exchange
                 # Assuming a Gamma-point calculation for now in supercell
                 spins = f.create_group(self.spin_str % s0)
@@ -184,17 +190,19 @@ class ExcitonTB:
                             )
 
                         elem_shape = (c_num_m*c_num_l, v_num_m*v_num_l)
-                        mmm = kpts.create_dataset(name='mat_elems',
+                        elems = kpts.create_dataset(name='mat_elems',
                                                   shape=elem_shape,
                                                   dtype='complex')
 
-                        mmm[:] = np.dot(np.array(conduction).T,
-                                        np.dot(eh_int[ml1*nk_shift + ml2],
-                                               np.array(valence)))
+                        elems[:] = np.dot(np.array(conduction).T,
+                                          np.dot(eh_int[ml1*nk_shift + ml2],
+                                                 np.array(valence)))
 
                         del conduction, valence
 
-    def get_bse_eigensystem_direct(self, matrix_element_storage=None, solve=True):
+    def get_bse_eigensystem_direct(self,
+                                   matrix_element_storage=None,
+                                   solve=True):
         """
         Construct the Hamiltonian (and solve it if necessary) for the
         Bethe-Salpeter Equation for the direct photonic transitions (Q=0).
@@ -226,9 +234,7 @@ class ExcitonTB:
                                                         kq_idx=k_i,
                                                         q_crys=q_zero,
                                                         direct=True)
-            for s0 in range(2):
-                if self.n_spins == 1 and s0 == 1:
-                    continue
+            for s0 in range(self.n_spins):
                 k_skip = blocks[s0][k_i] if selective else k_i*block_skip
                 vnum1, cnum1 = self.get_number_conduction_valence_bands(
                     k_i, s0
@@ -249,9 +255,7 @@ class ExcitonTB:
             for l1, l2 in product(range(nk), range(nk)):
                 kp_i = nk*l1 + l2
                 kkp_1bz = [m1, m2, l1, l2]
-                for s0 in range(2):
-                    if self.n_spins == 1 and s0 == 1:
-                        continue
+                for s0 in range(self.n_spins):
                     # Read out precalculated scattering matrix
                     k_str = self.four_point_str % tuple(kkp_1bz)
                     s_str = self.spin_str % s0
