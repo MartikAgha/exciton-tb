@@ -57,8 +57,10 @@ def get_cumulative_positions(pattern, norb):
 
     p_sum = sum(pattern)
     p_len = len(pattern)
-    if norb % p_len != 0:
+
+    if norb % p_sum != 0:
         raise Exception("Pattern does not fit periodically in orbital set")
+
     cumul_term = lambda i: (i//p_len)*p_sum + sum(pattern[:(i % p_len) + 1])
     cumulative_positions = [0] + [cumul_term(i) for i in range(norb)]
     return cumulative_positions
@@ -127,23 +129,53 @@ def extract_exciton_dos(excitons,
                 density_of_states[idx2] += smearing
     return density_of_states
 
-def convert_eigenvector_convention(eigenvectors, kpt, motif, orb_pattern, nat):
+def convert_eigenvector_convention(eigenvectors, kpt, motif, orb_pattern):
     """
-    Change eigenvectors from convention II to convention I.
+    Change eigenvector block at a k point from convention II to convention I.
     :param eigenvectors: Matrix of eigenvectors
     :param kpt: k point eigenvectors are calculated at
     :param motif: list of motif vectors in order of
     :param orbital_pattern: orbital pattern of number of orbitals per position
-    :param nat: number of atoms in the system,
     :return:
     """
+    nat = len(motif)
     phase_vector = [np.exp(-1j*np.dot(kpt, vector)) for vector in motif]
-    full_pattern = [orb_pattern[i % nat] for i in range(nat)]
+    full_pattern = [orb_pattern[i % len(orb_pattern)] for i in range(nat)]
     phase_nested_list = [[phase_vector[i]]*full_pattern[i] for i in range(nat)]
     phase_array = np.array(list(chain(*phase_nested_list)))
     eigenvectors_rotate = np.multiply(phase_array.reshape(-1, 1), eigenvectors)
     return eigenvectors_rotate
 
+def convert_all_eigenvectors(eigenvectors,
+                             k_grid,
+                             motif,
+                             orb_pattern,
+                             nbasis,
+                             spin_split=False):
+    """
+    Change all eigenvectors from convention II to convention I.
+    :param eigenvectors: Matrix of eigenvectors
+    :param k_grid: k points that eigenvectors are calculated at
+    :param motif: list of motif vectors in order of
+    :param orbital_pattern: orbital pattern of number of orbitals per position
+    :param nbasis: number of elements in the basis
+    :param spin_split: True if system is spin divided.
+    :return:
+    """
+    eigenvectors_rotated = np.zeros(eigenvectors.shape, dtype=complex)
+    for idx, kpt in enumerate(k_grid):
+        for s in range(2):
+            if s == 1 and not spin_split:
+                continue
+            j1 = idx*nbasis + s*nbasis
+            j2 = (idx + 1)*nbasis - int(spin_split)*(1 - s)*nbasis
+            eig_block = eigenvectors[j1:j2, :]
+            eig_block_rotate = convert_eigenvector_convention(eig_block,
+                                                              kpt,
+                                                              motif,
+                                                              orb_pattern)
+            eigenvectors_rotated[j1:j2, :] = eig_block_rotate
 
+    return eigenvectors_rotated
 
 

@@ -2,7 +2,6 @@
 import os
 from itertools import product
 
-import scipy as sp
 import numpy as np
 import h5py as hp
 import numpy.linalg as napla
@@ -10,7 +9,7 @@ import numpy.linalg as napla
 from .exciton_tools import get_complex_zeros, cplx_exp_dot, \
                            get_cumulative_positions, reduced_tb_vec, \
                            recentre_continuous, get_supercell_positions, \
-                           fix_consistent_gauge
+                           fix_consistent_gauge, convert_all_eigenvectors
 from .exciton_interactions import interaction_potential
 
 
@@ -66,6 +65,7 @@ class ExcitonTB:
         self.n_val = int(np.array(self.file_storage['eigensystem']['n_val']))
         self.n_con = int(np.array(self.file_storage['eigensystem']['n_con']))
         self.n_spins = int(np.array(self.file_storage['eigensystem']['n_spins']))
+        self.convention = int(np.array(self.file_storage['eigensystem']['convention']))
         if not self.n_spins in [1, 2]:
             raise Exception("eigensystem/n_spins must be either 1 or 2.")
         self.is_complex = bool(np.array(
@@ -82,8 +82,8 @@ class ExcitonTB:
 
         # Value of the position to use ear R-->0 in the interaction potential.
         self.trunc_alat = float(np.array(self.file_storage['crystal']['trunc_alat']))
-        orb_pattern = list(self.file_storage['crystal']['orb_pattern'])
-        self.cumulative_positions = get_cumulative_positions(orb_pattern,
+        self.orb_pattern = list(self.file_storage['crystal']['orb_pattern'])
+        self.cumulative_positions = get_cumulative_positions(self.orb_pattern,
                                                              self.n_orbs)
 
         self.selective_mode = bool(np.array(self.file_storage['selective']))
@@ -528,5 +528,16 @@ class ExcitonTB:
             eigvecs_real = np.array(f['eigensystem']['eigenvectors_real'])
             eigvecs_imag = np.array(f['eigensystem']['eigenvectors_imag'])
             eigenvectors = eigvecs_real + 1j*eigvecs_imag
+
+        if self.convention == 2:
+            eigenvectors = convert_all_eigenvectors(eigenvectors,
+                                                    self.k_grid,
+                                                    self.motif_vectors,
+                                                    self.orb_pattern,
+                                                    self.n_orbs,
+                                                    bool(self.n_spins == 2))
+        elif not self.convention == 1:
+            raise Exception("Convention should be 1 or 2.")
+
         return eigenvectors
 
