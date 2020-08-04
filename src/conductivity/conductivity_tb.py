@@ -66,9 +66,7 @@ class ConductivityTB:
 
         n_shift = self.n_spins*self.n_orbs
         for idx1, kpt in enumerate(self.k_grid):
-            for s0 in range(2):
-                if self.n_spins == 1 and s0 == 1:
-                    continue
+            for s0 in range(self.n_spins):
                 velocity_matrix = self.load_velocity_matrix(idx1)
                 bands = self.exciton_obj.get_number_conduction_valence_bands(
                     idx1, s0
@@ -139,9 +137,7 @@ class ConductivityTB:
         # Construct vector of velocity matrix elements to dot with the
         # bse eigenvector.
         velocity_element_lists = []
-        for s0 in range(2):
-            if self.n_spins == 1 and s0 == 1:
-                continue
+        for s0 in range(self.n_spins):
             velocity_elements = []
             for idx_1, kpt in enumerate(self.k_grid):
                 velocity_matrix = self.load_velocity_matrix(idx_1)
@@ -166,8 +162,6 @@ class ConductivityTB:
 
         bse_eigsys = self.exciton_obj.get_bse_eigensystem_direct(solve=True)
         for s0 in range(self.n_spins):
-            if self.n_spins == 1 and s0 == 1:
-                continue
             for idx_1 in range(len(bse_eigsys[s0][0])):
                 bse_vector = bse_eigsys[s0][1][:, idx_1]
                 bse_value = bse_eigsys[s0][0][idx_1]

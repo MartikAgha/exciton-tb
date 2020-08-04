@@ -131,7 +131,7 @@ class ExcitonTB:
             f['VkM'] = eh_int
             nk_shift = nk if nk == 1 else 2*nk
 
-            state_shift = norb if self.n_spins == 1 else 2*norb
+            state_shift = self.n_spins*norb
 
             for s0 in range(self.n_spins):
                 # Two separate sets for up and down spin for non-exchange
@@ -541,7 +541,7 @@ class ExcitonTB:
                                                     self.n_orbs,
                                                     bool(self.n_spins == 2))
         elif not self.convention == 1:
-            raise Exception("Convention should be 1 or 2.")
+            raise ValueError("Convention should be 1 or 2.")
 
         return eigenvectors
 
