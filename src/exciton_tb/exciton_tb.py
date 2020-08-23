@@ -551,7 +551,12 @@ class ExcitonTB:
         return eigenvectors
 
     def get_cutoff_band_min_maxes(self, energy_cutoff):
-
+        """
+        Calculate an array of all minimum valence bands and maximum conduction
+        bands for each k point index and spin index (if applicable).
+        @param energy_cutoff: Value with which to deteremine required bands.
+        @return:
+        """
         eigvals = np.array(self.file_storage['eigensystem']['eigenvalues'])
         cutoff_band_min_maxes = np.zeros((self.n_spins, self.n_k**2, 2))
 
@@ -561,7 +566,6 @@ class ExcitonTB:
                 v_num, c_num = self.get_number_conduction_valence_bands(k_idx,
                                                                         s0)
                 if energy_cutoff is not None:
-                    # issue here, how are eigenvalues split
                     eigvals_k = eigvals[k_idx]
                     idx_1 = s0*(len(eigvals_k) - v_num - c_num)
                     idx_2 = len(eigvals_k) if bool(s0) else v_num + c_num
@@ -570,7 +574,7 @@ class ExcitonTB:
                                                          energy_cutoff,
                                                          v_num)
                     cutoff_band_min_maxes[s0][k_idx][0] = v_min
-                    cutoff_band_min_maxes[s0][k_idx][1] = c_max
+                    cutoff_band_min_maxes[s0][k_idx][1] = c_max - v_num
                 else:
                     cutoff_band_min_maxes[s0][k_idx][0] = 0
                     cutoff_band_min_maxes[s0][k_idx][1] = c_num
@@ -578,12 +582,28 @@ class ExcitonTB:
         return cutoff_band_min_maxes
 
     @staticmethod
-    def get_band_extrema(eigenvalues, energy_limit, edge_index):
+    def get_band_extrema(eigenvalues, energy_cutoff, edge_index):
+        """
+        Given an energy cutoff, finds the band indices that given the minimum
+        valence band within the cutoff below the conduction band, and the
+        maximum conduction band within a cutoff above the valence band.
+        @param eigenvalues: list of eigenvalues
+        @param energy_cutoff: energy to decide which bands we require
+        @param edge_index: index of the conduction band
+        @return:
+        """
 
-        max_energy = eigenvalues[edge_index] + energy_limit
-        min_energy = eigenvalues[edge_index + 1] - energy_limit
+        max_energy = eigenvalues[edge_index - 1] + energy_cutoff
+        min_energy = eigenvalues[edge_index] - energy_cutoff
 
-        cb_max = list(eigenvalues < max_energy).index(False) + 1
-        vb_min = list(eigenvalues >= min_energy).index(True)
+        try:
+            cb_max = list(eigenvalues < max_energy).index(False) + 1
+        except ValueError:
+            cb_max = len(eigenvalues) - 1
+
+        try:
+            vb_min = list(eigenvalues >= min_energy).index(True)
+        except ValueError:
+            vb_min = 0
 
         return cb_max, vb_min
