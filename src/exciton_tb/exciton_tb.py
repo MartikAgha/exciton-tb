@@ -109,7 +109,7 @@ class ExcitonTB:
 
         self.element_storage_name = None
 
-    def create_matrix_element_hdf5(self, storage_name):
+    def create_matrix_element_hdf5(self, storage_name, energy_cutoff=None):
         """
         Create matrix elements for the direct coulomb interaction
         :param storage_name: name for the hdf5 storage for matrix elements.
@@ -125,10 +125,14 @@ class ExcitonTB:
         # Containers for outputted data
         pos_list = self.r_grid
 
+        # Place holder function to get cutoff_band_min_maxes
+        cutoff_band_min_maxes = self.get_cutoff_band_min_maxes(energy_cutoff)
+
         with hp.File(self.element_storage_name, 'w') as f:
             eigvecs = self.get_preprocessed_eigenvectors()
             eh_int = self.get_eh_int(nat, nk, pos_list)
             f['VkM'] = eh_int
+            f['energy_cutoff'] = energy_cutoff
             nk_shift = nk if nk == 1 else 2*nk
 
             state_shift = self.n_spins*norb
@@ -164,6 +168,7 @@ class ExcitonTB:
                         m_shf, l_shf = ki_m*state_shift, ki_l*state_shift
                         id_string = self.four_point_str % (m1, m2, l1, l2)
                         kpts = spins.create_group(id_string)
+
                         e_m, e_l = m_shf + s0*norb, l_shf + s0*norb
 
                         vb_iter = product(range(v_num_m), range(v_num_l))
@@ -191,8 +196,8 @@ class ExcitonTB:
 
                         elem_shape = (c_num_m*c_num_l, v_num_m*v_num_l)
                         elems = kpts.create_dataset(name='mat_elems',
-                                                  shape=elem_shape,
-                                                  dtype='complex')
+                                                    shape=elem_shape,
+                                                    dtype='complex')
 
                         elems[:] = np.dot(np.array(conduction).T,
                                           np.dot(eh_int[ml1*nk_shift + ml2],
@@ -545,3 +550,40 @@ class ExcitonTB:
 
         return eigenvectors
 
+    def get_cutoff_band_min_maxes(self, energy_cutoff):
+
+        eigvals = np.array(self.file_storage['eigensystem']['eigenvalues'])
+        cutoff_band_min_maxes = np.zeros((self.n_spins, self.n_k**2, 2))
+
+        for s0 in range(self.n_spins):
+            for m1, m2 in product(range(self.n_k), range(self.n_k)):
+                k_idx = m1*self.n_k + m2
+                v_num, c_num = self.get_number_conduction_valence_bands(k_idx,
+                                                                        s0)
+                if energy_cutoff is not None:
+                    # issue here, how are eigenvalues split
+                    eigvals_k = eigvals[k_idx]
+                    idx_1 = s0*(len(eigvals_k) - v_num - c_num)
+                    idx_2 = len(eigvals_k) if bool(s0) else v_num + c_num
+                    eigvals_k_s0 = eigvals_k[idx_1:idx_2]
+                    c_max, v_min = self.get_band_extrema(eigvals_k_s0,
+                                                         energy_cutoff,
+                                                         v_num)
+                    cutoff_band_min_maxes[s0][k_idx][0] = v_min
+                    cutoff_band_min_maxes[s0][k_idx][1] = c_max
+                else:
+                    cutoff_band_min_maxes[s0][k_idx][0] = 0
+                    cutoff_band_min_maxes[s0][k_idx][1] = c_num
+
+        return cutoff_band_min_maxes
+
+    @staticmethod
+    def get_band_extrema(eigenvalues, energy_limit, edge_index):
+
+        max_energy = eigenvalues[edge_index] + energy_limit
+        min_energy = eigenvalues[edge_index + 1] - energy_limit
+
+        cb_max = list(eigenvalues < max_energy).index(False) + 1
+        vb_min = list(eigenvalues >= min_energy).index(True)
+
+        return cb_max, vb_min
