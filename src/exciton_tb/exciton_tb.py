@@ -143,12 +143,18 @@ class ExcitonTB:
                 spins = f.create_group(self.spin_str % s0)
 
                 for m1, m2 in product(range(nk), range(nk)):
+                    ki_m = m1*nk + m2
+                    # For each k point, record the new c_num and v_max
+                    k_minmax = spins.create_group('(%d,%d)' % (m1, m2))
+                    k_minmax['v_min'] = cutoff_band_min_maxes[s0][ki_m][0]
+                    k_minmax['c_max'] = cutoff_band_min_maxes[s0][ki_m][1]
+
                     for l1, l2 in product(range(nk), range(nk)):
+                        ki_l = l1*nk + l2
+
                         # Indices to navigate through k,k' data
                         ml1 = m1 - l1 + nk if nk > 1 else 0
                         ml2 = m2 - l2 + nk if nk > 1 else 0
-
-                        ki_m, ki_l = m1*nk + m2, l1*nk + l2
 
                         bandnum_m = self.get_number_conduction_valence_bands(
                             ki_m, s0
@@ -159,6 +165,16 @@ class ExcitonTB:
                             ki_l, s0
                         )
                         v_num_l, c_num_l = bandnum_l
+
+                        if energy_cutoff is not None:
+                            cutoff_minmax_m = cutoff_band_min_maxes[s0][ki_m]
+                            cutoff_minmax_l = cutoff_band_min_maxes[s0][ki_l]
+                            v_min_m, c_num_m = tuple(cutoff_minmax_m)
+                            v_min_l, c_num_l = tuple(cutoff_minmax_l)
+                            v_num_m = v_num_m - v_min_m
+                            v_num_l = v_num_l - v_min_l
+                        else:
+                            v_min_m, v_min_l = 0, 0
 
                         valence = np.zeros((nat, v_num_m*v_num_l),
                                            dtype='complex')
@@ -177,8 +193,8 @@ class ExcitonTB:
                             # This is reversed compared to conduction band
                             vm_i = v2*v_num_m + v1
                             valence[:, vm_i] = reduced_tb_vec(
-                                eigvecs[e_l:e_l + norb, v2],
-                                eigvecs[e_m:e_m + norb, v1],
+                                eigvecs[e_l:e_l + norb, v_min_l + v2],
+                                eigvecs[e_m:e_m + norb, v_min_m + v1],
                                 nat,
                                 self.cumulative_positions
                             )
