@@ -169,8 +169,10 @@ class ExcitonTB:
                         if energy_cutoff is not None:
                             cutoff_minmax_m = cutoff_band_min_maxes[s0][ki_m]
                             cutoff_minmax_l = cutoff_band_min_maxes[s0][ki_l]
-                            v_min_m, c_num_m = tuple(cutoff_minmax_m)
-                            v_min_l, c_num_l = tuple(cutoff_minmax_l)
+                            v_min_m = int(cutoff_minmax_m[0])
+                            c_num_m = int(cutoff_minmax_m[1])
+                            v_min_l = int(cutoff_minmax_l[0])
+                            c_num_l = int(cutoff_minmax_l[1])
                             v_num_m = v_num_m - v_min_m
                             v_num_l = v_num_l - v_min_l
                         else:
@@ -204,8 +206,8 @@ class ExcitonTB:
                             # for c1, k and c2, k' find matrix element
                             cm_i = c1*c_num_l + c2
                             conduction[:, cm_i] = reduced_tb_vec(
-                                eigvecs[e_m:e_m + norb, v_num_m + c1],
-                                eigvecs[e_l:e_l + norb, v_num_l + c2],
+                                eigvecs[e_m:e_m + norb, v_min_m + v_num_m + c1],
+                                eigvecs[e_l:e_l + norb, v_min_l + v_num_l + c2],
                                 nat,
                                 self.cumulative_positions
                             )
@@ -623,3 +625,4 @@ class ExcitonTB:
             vb_min = 0
 
         return cb_max, vb_min
+
