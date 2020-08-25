@@ -247,7 +247,7 @@ class ExcitonTB:
         n_val, n_con = self.n_val, self.n_con
         selective = self.selective_mode
 
-        mat_dim, blocks = self.get_matrix_dim_and_block_starts()
+        mat_dim, blocks = self.get_matrix_dim_and_block_starts(g)
         block_skip = n_con*n_val
         spin_shift = n_con + n_val
         bse_mat = [get_complex_zeros(mat_dim[i]) for i in range(self.n_spins)]
@@ -426,7 +426,7 @@ class ExcitonTB:
 
         return fourier_term
 
-    def get_matrix_dim_and_block_starts(self):
+    def get_matrix_dim_and_block_starts(self, element_storage):
         """
         Get matrix dimensions.
         :param split:
@@ -449,6 +449,15 @@ class ExcitonTB:
                     c_num_h5 = f['band_edges'][one_point_str % idx]['cb_num']
                     v_num = int(np.array(v_num_h5))
                     c_num = int(np.array(c_num_h5))
+                    if bool(element_storage['use_energy_cutoff']):
+                        xs = '(%d,%d)' % (idx % self.n_k, idx // self.n_k)
+                        v_min = np.array(
+                            element_storage['cutoff_bands']['s0'][xs]['v_min']
+                        )
+                        v_num = v_num - v_min
+                        c_num = np.array(
+                            element_storage['cutoff_bands']['s0'][xs]['c_max']
+                        )
                     blocks.append(cumul_position)
                     cumul_position += v_num*c_num
                 # No spin-split system
@@ -461,6 +470,22 @@ class ExcitonTB:
                     c_num_h5 = f['band_edges'][one_point_str % idx]['cb_num']
                     v_num = list(np.array(v_num_h5))
                     c_num = list(np.array(c_num_h5))
+                    if bool(element_storage['use_energy_cutoff']):
+                        xs = '(%d,%d)' % (idx % self.n_k, idx // self.n_k)
+                        v_min_0 = np.array(
+                            element_storage['cutoff_bands']['s0'][xs]['v_min']
+                        )
+                        v_min_1 = np.array(
+                            element_storage['cutoff_bands']['s1'][xs]['v_min']
+                        )
+                        c_num_0 = np.array(
+                            element_storage['cutoff_bands']['s0'][xs]['c_max']
+                        )
+                        c_num_1 = np.array(
+                            element_storage['cutoff_bands']['s1'][xs]['c_max']
+                        )
+                        v_num = [v_num[0] - v_min_0, v_num[1] - v_min_1]
+                        c_num = [c_num_0, c_num_1]
                     for s0 in range(2):
                         blocks[s0].append(cumul_position_split[s0])
                         cumul_position_split[s0] += v_num[s0]*c_num[s0]
