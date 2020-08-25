@@ -132,7 +132,9 @@ class ExcitonTB:
             eigvecs = self.get_preprocessed_eigenvectors()
             eh_int = self.get_eh_int(nat, nk, pos_list)
             f['VkM'] = eh_int
-            f['energy_cutoff'] = energy_cutoff
+            f['use_energy_cutoff'] = bool(energy_cutoff is not None)
+            f['energy_cutoff'] = 0 if energy_cutoff is None else energy_cutoff
+            cutoff_bands = f.create_group('cutoff_bands')
             nk_shift = nk if nk == 1 else 2*nk
 
             state_shift = self.n_spins*norb
@@ -141,11 +143,12 @@ class ExcitonTB:
                 # Two separate sets for up and down spin for non-exchange
                 # Assuming a Gamma-point calculation for now in supercell
                 spins = f.create_group(self.spin_str % s0)
+                spins_cutoff = cutoff_bands.create_group(self.spin_str % s0)
 
                 for m1, m2 in product(range(nk), range(nk)):
                     ki_m = m1*nk + m2
                     # For each k point, record the new c_num and v_max
-                    k_minmax = spins.create_group('(%d,%d)' % (m1, m2))
+                    k_minmax = spins_cutoff.create_group('(%d,%d)' % (m1, m2))
                     k_minmax['v_min'] = cutoff_band_min_maxes[s0][ki_m][0]
                     k_minmax['c_max'] = cutoff_band_min_maxes[s0][ki_m][1]
 
