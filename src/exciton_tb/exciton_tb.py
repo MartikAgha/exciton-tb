@@ -71,7 +71,7 @@ class ExcitonTB:
             self.file_storage['eigensystem']['convention']
         ))
 
-        if not self.n_spins in [1, 2]:
+        if self.n_spins not in [1, 2]:
             raise ValueError("eigensystem/n_spins must be either 1 or 2.")
 
         self.is_complex = bool(np.array(
@@ -350,11 +350,11 @@ class ExcitonTB:
         # Decide whether to solve or output the hamiltonian to be
         # diagonalised elsewhere
         if solve:
-            exciton_eigsys = [napla.eigh(bse_mat[i]) for i in range(self.n_spins)]
+            bse_eigsys = [napla.eigh(bse_mat[i]) for i in range(self.n_spins)]
         else:
-            exciton_eigsys = bse_mat
+            bse_eigsys = bse_mat
 
-        return exciton_eigsys
+        return bse_eigsys
 
     def terminate_storage_usage(self):
         """Terminate the current usage session of the HDF5 file."""
