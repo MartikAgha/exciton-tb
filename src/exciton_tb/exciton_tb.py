@@ -441,23 +441,27 @@ class ExcitonTB:
         # bse matrix with kpoint blocks that have different number of bands
 
         one_point_str = self.one_point_str
-        if self.selective_mode:
+        selective_bool = (self.selective_mode or
+                          bool(element_storage['use_energy_cutoff']))
+        if selective_bool:
             if self.n_spins == 1:
                 blocks = []
                 for idx in range(len(self.k_grid)):
-                    v_num_h5 = f['band_edges'][one_point_str % idx]['vb_num']
-                    c_num_h5 = f['band_edges'][one_point_str % idx]['cb_num']
-                    v_num = int(np.array(v_num_h5))
-                    c_num = int(np.array(c_num_h5))
+                    v_num, c_num = n_val, n_con
+                    if self.selective_mode:
+                        v_num_h5 = f['band_edges'][one_point_str % idx]['vb_num']
+                        c_num_h5 = f['band_edges'][one_point_str % idx]['cb_num']
+                        v_num = int(np.array(v_num_h5))
+                        c_num = int(np.array(c_num_h5))
                     if bool(element_storage['use_energy_cutoff']):
                         xs = '(%d,%d)' % (idx % self.n_k, idx // self.n_k)
-                        v_min = np.array(
+                        v_min = int(np.array(
                             element_storage['cutoff_bands']['s0'][xs]['v_min']
-                        )
+                        ))
                         v_num = v_num - v_min
-                        c_num = np.array(
+                        c_num = int(np.array(
                             element_storage['cutoff_bands']['s0'][xs]['c_max']
-                        )
+                        ))
                     blocks.append(cumul_position)
                     cumul_position += v_num*c_num
                 # No spin-split system
@@ -466,10 +470,12 @@ class ExcitonTB:
             else:
                 blocks = [[], []]
                 for idx in range(len(self.k_grid)):
-                    v_num_h5 = f['band_edges'][one_point_str % idx]['vb_num']
-                    c_num_h5 = f['band_edges'][one_point_str % idx]['cb_num']
-                    v_num = list(np.array(v_num_h5))
-                    c_num = list(np.array(c_num_h5))
+                    v_num, c_num = [n_val, n_val], [n_con, n_con]
+                    if self.selective_mode:
+                        v_num_h5 = f['band_edges'][one_point_str % idx]['vb_num']
+                        c_num_h5 = f['band_edges'][one_point_str % idx]['cb_num']
+                        v_num = list(np.array(v_num_h5))
+                        c_num = list(np.array(c_num_h5))
                     if bool(element_storage['use_energy_cutoff']):
                         xs = '(%d,%d)' % (idx % self.n_k, idx // self.n_k)
                         v_min_0 = np.array(
