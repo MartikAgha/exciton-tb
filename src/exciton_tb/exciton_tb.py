@@ -262,7 +262,11 @@ class ExcitonTB:
                                                         q_crys=q_zero,
                                                         direct=True)
             for s0 in range(self.n_spins):
-                k_skip = blocks[s0][k_i] if selective else k_i*block_skip
+                k_skip = k_i*block_skip
+
+                if selective or energy_cutoff_bool:
+                    k_skip = blocks[s0][k_i]
+
                 vnum1, cnum1 = self.get_number_conduction_valence_bands(
                     k_i, s0
                 )
@@ -306,9 +310,11 @@ class ExcitonTB:
 
                     k_skip = k_i*block_skip
                     kp_skip = kp_i*block_skip
-                    if selective:
+
+                    if selective or energy_cutoff_bool:
                         k_skip = blocks[s0][k_i]
                         kp_skip = blocks[s0][kp_i]
+
                     vnum1, cnum1 = self.get_number_conduction_valence_bands(
                         k_i, s0
                     )
