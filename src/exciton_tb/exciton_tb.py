@@ -243,6 +243,7 @@ class ExcitonTB:
             element_storage = matrix_element_storage
 
         g = hp.File(element_storage, 'r')
+        energy_cutoff_bool = bool(np.array(g['use_energy_cutoff']))
         nk, nk2 = self.n_k, self.n_k**2
         n_val, n_con = self.n_val, self.n_con
         selective = self.selective_mode
@@ -265,12 +266,28 @@ class ExcitonTB:
                 vnum1, cnum1 = self.get_number_conduction_valence_bands(
                     k_i, s0
                 )
+
+                # This should be defined before we change v_num and c_num to
+                # account for energy cutoff.
                 spin_skip = s0*(vnum1 + cnum1) if selective else s0*spin_shift
+
+                if energy_cutoff_bool:
+                    k_str = '(%d,%d)' % (m1, m2)
+                    s_str = self.spin_str % s0
+                    v_min = int(np.array(
+                        g['cutoff_bands'][s_str][k_str]['v_min']
+                    ))
+                    cnum1 = int(np.array(
+                        g['cutoff_bands'][s_str][k_str]['c_max']
+                    ))
+                    vnum1 = vnum1 - v_min
+                else:
+                    v_min = 0
 
                 for c, v in product(range(cnum1), range(vnum1)):
                     mat_idx = k_skip + c*vnum1 + v
-                    final_energy = energy_kq[vnum1 + c + spin_skip]
-                    init_energy = energy_k[v + spin_skip]
+                    final_energy = energy_kq[v_min + vnum1 + c + spin_skip]
+                    init_energy = energy_k[v_min + v + spin_skip]
                     energy_diff = final_energy - init_energy
                     bse_mat[s0][mat_idx, mat_idx] = energy_diff
 
@@ -287,15 +304,36 @@ class ExcitonTB:
                     s_str = self.spin_str % s0
                     scatter_int = np.array(g[s_str][k_str]['mat_elems'])
 
-                    k_skip = blocks[s0][k_i] if selective else k_i*block_skip
-                    kp_skip = blocks[s0][kp_i] if selective else kp_i*block_skip
-
+                    k_skip = k_i*block_skip
+                    kp_skip = kp_i*block_skip
+                    if selective:
+                        k_skip = blocks[s0][k_i]
+                        kp_skip = blocks[s0][kp_i]
                     vnum1, cnum1 = self.get_number_conduction_valence_bands(
                         k_i, s0
                     )
                     vnum2, cnum2 = self.get_number_conduction_valence_bands(
                         kp_i, s0
                     )
+                    if energy_cutoff_bool:
+                        k_str = '(%d,%d)' % (m1, m2)
+                        kp_str = '(%d,%d)' % (l1, l2)
+
+                        v_min = np.array(
+                            g['cutoff_bands'][s_str][k_str]['v_min']
+                        )
+                        v_min_p = np.array(
+                            g['cutoff_bands'][s_str][kp_str]['v_min']
+                        )
+                        vnum1 = vnum1 - int(v_min)
+                        vnum2 = vnum2 - int(v_min_p)
+
+                        cnum1 = int(np.array(
+                            g['cutoff_bands'][s_str][k_str]['c_max']
+                        ))
+                        cnum2 = int(np.array(
+                            g['cutoff_bands'][s_str][kp_str]['c_max']
+                        ))
 
                     for c1, c2 in product(range(cnum1), range(cnum2)):
                         for v1, v2 in product(range(vnum1), range(vnum2)):
