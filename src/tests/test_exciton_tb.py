@@ -92,6 +92,26 @@ class TestExcitonTB(unittest.TestCase):
                 }
             }
         }
+        self.matrix_element_properties = {
+            '1': {
+                'matrix_element_size': {
+                    '1.8': (0, 0), '2.0': (0, 0), '2.5': (0, 0),
+                    '3.0': (0, 0), '3.5': (0, 0)
+                }
+            },
+            '2': {
+                'matrix_element_size': {
+                    '1.8': (0, 0), '2.0': (0, 0), '2.5': (0, 0),
+                    '3.0': (0, 0), '3.5': (0, 0)
+                }
+            },
+            '3': {
+                'matrix_element_size': {
+                    '1.8': (0, 0), '2.0': (0, 0), '2.5': (0, 0),
+                    '3.0': (0, 0), '3.5': (0, 0)
+                }
+            }
+        }
 
     def assertListAlmostEqual(self, list1, list2, places):
         self.assertEqual(len(list1), len(list2))
@@ -139,8 +159,12 @@ class TestExcitonTB(unittest.TestCase):
                                        extb.a2,
                                        places=self.dp)
 
-    def test_hdf5_storage_creation(self):
-        raise NotImplementedError()
+    def test_creation_matrix_element_storage(self):
+         for test_tag, test_dict in self.init_properties.items():
+            test_file = self.test_input_template % test_tag
+            test_path = os.path.join(self.test_input_folder, test_file)
+            extb = ExcitonTB(test_path)
+
 
     def test_vector_modulo_cell(self):
         raise NotImplementedError()
