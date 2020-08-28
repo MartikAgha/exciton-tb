@@ -8,7 +8,8 @@ from exciton_tb.exciton_tb import ExcitonTB
 class TestExcitonTB(unittest.TestCase):
 
     def setUp(self):
-        raise NotImplementedError()
+        init_interactions = ['keldysn', 'yukawa', 'coulomb']
+
 
     def test_exciton_tb_init(self):
         raise NotImplementedError()
