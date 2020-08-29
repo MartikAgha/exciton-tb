@@ -173,9 +173,9 @@ class ExcitonTB:
                             cutoff_minmax_m = cutoff_band_min_maxes[s0][ki_m]
                             cutoff_minmax_l = cutoff_band_min_maxes[s0][ki_l]
                             v_min_m = int(cutoff_minmax_m[0])
-                            c_num_m = int(cutoff_minmax_m[1])
+                            c_num_m = int(cutoff_minmax_m[1]) + 1
                             v_min_l = int(cutoff_minmax_l[0])
-                            c_num_l = int(cutoff_minmax_l[1])
+                            c_num_l = int(cutoff_minmax_l[1]) + 1
                             v_num_m = v_num_m - v_min_m
                             v_num_l = v_num_l - v_min_l
                         else:
@@ -648,8 +648,9 @@ class ExcitonTB:
 
     def get_cutoff_band_min_maxes(self, energy_cutoff):
         """
-        Calculate an array of all minimum valence bands and maximum conduction
-        bands for each k point index and spin index (if applicable).
+        Calculate an array of all minimum valence band indices and maximum
+        conduction band indices for each k point index and spin index
+        (if applicable).
         @param energy_cutoff: Value with which to deteremine required bands.
         @return:
         """
@@ -673,7 +674,7 @@ class ExcitonTB:
                     cutoff_band_min_maxes[s0][k_idx][1] = c_max - v_num
                 else:
                     cutoff_band_min_maxes[s0][k_idx][0] = 0
-                    cutoff_band_min_maxes[s0][k_idx][1] = c_num
+                    cutoff_band_min_maxes[s0][k_idx][1] = c_num - 1
 
         return cutoff_band_min_maxes
 
@@ -693,7 +694,7 @@ class ExcitonTB:
         min_energy = eigenvalues[edge_index] - energy_cutoff
 
         try:
-            cb_max = list(eigenvalues < max_energy).index(False) + 1
+            cb_max = list(eigenvalues < max_energy).index(False)
         except ValueError:
             cb_max = len(eigenvalues) - 1
 
