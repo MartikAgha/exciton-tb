@@ -375,9 +375,6 @@ class TestExcitonTB(unittest.TestCase):
                         places=self.dp
                     )
 
-    def test_electron_hole_interaction(self):
-        raise NotImplementedError()
-
 
 if __name__ == '__main__':
     unittest.main()
