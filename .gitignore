@@ -1,0 +1,9 @@
+.idea/*
+example_input_hdf5/.nsf*
+graphs/*
+matrix_element_hdf5/*
+src/exciton_tb/__pycache__
+src/conductivity/__pycache__
+src/test/__pycache__
+src/util/__pycache__
+
