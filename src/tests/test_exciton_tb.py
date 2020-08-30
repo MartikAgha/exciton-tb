@@ -2,6 +2,7 @@ import os
 import unittest
 
 import numpy as np
+from h5py import File
 
 from exciton_tb.exciton_tb import ExcitonTB
 
@@ -11,6 +12,7 @@ class TestExcitonTB(unittest.TestCase):
     test_input_folder = 'tests/testing_data'
     test_input_template = 'test_sample_%s.hdf5'
     dp = 6
+    matrix_element_name = '../matrix_element_hdf5/matrix_element.hdf5'
 
     def setUp(self):
         self.init_interactions = ['keldysn', 'yukawa', 'coulomb']
@@ -92,7 +94,53 @@ class TestExcitonTB(unittest.TestCase):
                 }
             }
         }
-        self.energy_cutoffs = ['1.8', '2.0', '2.5', '3.0', '3.5']
+        self.energy_cutoffs = ['1.8', '2.0', '2.5', '3.0', '4.0']
+        self.two_point_k_strings = {
+            '1': ['k(0,0,0,0)', 'k(0,0,0,1)', 'k(0,0,0,2)', 'k(0,0,1,0)',
+                  'k(0,0,1,1)', 'k(0,0,1,2)', 'k(0,0,2,0)', 'k(0,0,2,1)',
+                  'k(0,0,2,2)', 'k(0,1,0,0)', 'k(0,1,0,1)', 'k(0,1,0,2)',
+                  'k(0,1,1,0)', 'k(0,1,1,1)', 'k(0,1,1,2)', 'k(0,1,2,0)',
+                  'k(0,1,2,1)', 'k(0,1,2,2)', 'k(0,2,0,0)', 'k(0,2,0,1)',
+                  'k(0,2,0,2)', 'k(0,2,1,0)', 'k(0,2,1,1)', 'k(0,2,1,2)',
+                  'k(0,2,2,0)', 'k(0,2,2,1)', 'k(0,2,2,2)', 'k(1,0,0,0)',
+                  'k(1,0,0,1)', 'k(1,0,0,2)', 'k(1,0,1,0)', 'k(1,0,1,1)',
+                  'k(1,0,1,2)', 'k(1,0,2,0)', 'k(1,0,2,1)', 'k(1,0,2,2)',
+                  'k(1,1,0,0)', 'k(1,1,0,1)', 'k(1,1,0,2)', 'k(1,1,1,0)',
+                  'k(1,1,1,1)', 'k(1,1,1,2)', 'k(1,1,2,0)', 'k(1,1,2,1)',
+                  'k(1,1,2,2)', 'k(1,2,0,0)', 'k(1,2,0,1)', 'k(1,2,0,2)',
+                  'k(1,2,1,0)', 'k(1,2,1,1)', 'k(1,2,1,2)', 'k(1,2,2,0)',
+                  'k(1,2,2,1)', 'k(1,2,2,2)', 'k(2,0,0,0)', 'k(2,0,0,1)',
+                  'k(2,0,0,2)', 'k(2,0,1,0)', 'k(2,0,1,1)', 'k(2,0,1,2)',
+                  'k(2,0,2,0)', 'k(2,0,2,1)', 'k(2,0,2,2)', 'k(2,1,0,0)',
+                  'k(2,1,0,1)', 'k(2,1,0,2)', 'k(2,1,1,0)', 'k(2,1,1,1)',
+                  'k(2,1,1,2)', 'k(2,1,2,0)', 'k(2,1,2,1)', 'k(2,1,2,2)',
+                  'k(2,2,0,0)', 'k(2,2,0,1)', 'k(2,2,0,2)', 'k(2,2,1,0)',
+                  'k(2,2,1,1)', 'k(2,2,1,2)', 'k(2,2,2,0)', 'k(2,2,2,1)',
+                  'k(2,2,2,2)'],
+            '2': ['k(0,0,0,0)'],
+            '3': ['k(0,0,0,0)', 'k(0,0,0,1)', 'k(0,0,0,2)', 'k(0,0,1,0)',
+                  'k(0,0,1,1)', 'k(0,0,1,2)', 'k(0,0,2,0)', 'k(0,0,2,1)',
+                  'k(0,0,2,2)', 'k(0,1,0,0)', 'k(0,1,0,1)', 'k(0,1,0,2)',
+                  'k(0,1,1,0)', 'k(0,1,1,1)', 'k(0,1,1,2)', 'k(0,1,2,0)',
+                  'k(0,1,2,1)', 'k(0,1,2,2)', 'k(0,2,0,0)', 'k(0,2,0,1)',
+                  'k(0,2,0,2)', 'k(0,2,1,0)', 'k(0,2,1,1)', 'k(0,2,1,2)',
+                  'k(0,2,2,0)', 'k(0,2,2,1)', 'k(0,2,2,2)', 'k(1,0,0,0)',
+                  'k(1,0,0,1)', 'k(1,0,0,2)', 'k(1,0,1,0)', 'k(1,0,1,1)',
+                  'k(1,0,1,2)', 'k(1,0,2,0)', 'k(1,0,2,1)', 'k(1,0,2,2)',
+                  'k(1,1,0,0)', 'k(1,1,0,1)', 'k(1,1,0,2)', 'k(1,1,1,0)',
+                  'k(1,1,1,1)', 'k(1,1,1,2)', 'k(1,1,2,0)', 'k(1,1,2,1)',
+                  'k(1,1,2,2)', 'k(1,2,0,0)', 'k(1,2,0,1)', 'k(1,2,0,2)',
+                  'k(1,2,1,0)', 'k(1,2,1,1)', 'k(1,2,1,2)', 'k(1,2,2,0)',
+                  'k(1,2,2,1)', 'k(1,2,2,2)', 'k(2,0,0,0)', 'k(2,0,0,1)',
+                  'k(2,0,0,2)', 'k(2,0,1,0)', 'k(2,0,1,1)', 'k(2,0,1,2)',
+                  'k(2,0,2,0)', 'k(2,0,2,1)', 'k(2,0,2,2)', 'k(2,1,0,0)',
+                  'k(2,1,0,1)', 'k(2,1,0,2)', 'k(2,1,1,0)', 'k(2,1,1,1)',
+                  'k(2,1,1,2)', 'k(2,1,2,0)', 'k(2,1,2,1)', 'k(2,1,2,2)',
+                  'k(2,2,0,0)', 'k(2,2,0,1)', 'k(2,2,0,2)', 'k(2,2,1,0)',
+                  'k(2,2,1,1)', 'k(2,2,1,2)', 'k(2,2,2,0)', 'k(2,2,2,1)',
+                  'k(2,2,2,2)']
+        }
+
         self.matrix_element_properties = {
             '1': {'matrix_element_size': {
                     '1.8': {'k(1,2,1,2)': (9, 4), 'k(1,2,2,1)': (9, 4),
@@ -335,11 +383,24 @@ class TestExcitonTB(unittest.TestCase):
                                        places=self.dp)
 
     def test_creation_matrix_element_storage(self):
-         for test_tag, test_dict in self.matrix_element_properties.items():
+        for test_tag, test_dict in self.matrix_element_properties.items():
             test_file = self.test_input_template % test_tag
             test_path = os.path.join(self.test_input_folder, test_file)
             extb = ExcitonTB(test_path)
             for cutoff_str in self.energy_cutoffs:
+                extb.create_matrix_element_hdf5('matrix_element.hdf5',
+                                                float(cutoff_str))
+                with File(self.matrix_element_name, 'r') as f:
+                    for k_str in self.two_point_k_strings[test_tag]:
+                        el_shape = np.array(f['s0'][k_str]['mat_elems']).shape
+                        k_str_in_val = bool(k_str in test_dict[cutoff_str])
+                        has_non_zero_shape = bool(np.product(el_shape) > 0)
+                        self.assertEqual(k_str_in_val, has_non_zero_shape)
+
+                        if has_non_zero_shape:
+                            validation_shape = test_dict[cutoff_str][k_str]
+                            self.assertListEqual(list(el_shape),
+                                                 list(validation_shape))
 
     def test_vector_modulo_cell(self):
         raise NotImplementedError()
