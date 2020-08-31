@@ -697,7 +697,7 @@ class ExcitonTB:
         min_energy = eigenvalues[edge_index] - energy_cutoff
 
         try:
-            cb_max = list(eigenvalues < max_energy).index(False)
+            cb_max = list(eigenvalues <= max_energy).index(False) - 1
         except ValueError:
             cb_max = len(eigenvalues) - 1
 
@@ -707,4 +707,3 @@ class ExcitonTB:
             vb_min = 0
 
         return cb_max, vb_min
-
