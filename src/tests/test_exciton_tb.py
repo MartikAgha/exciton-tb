@@ -13,7 +13,8 @@ class TestExcitonTB(unittest.TestCase):
     test_input_template = 'test_sample_%s.hdf5'
     dp = 6
     element_dir = '../matrix_element_hdf5'
-    element_name_template = 'matrix_element_{}_{}.hdf5'
+    element_name_template_1 = 'matrix_element_1_{}_{}.hdf5'
+    element_name_template_2 = 'matrix_element_2_{}_{}.hdf5'
     element_key = 'matrix_element_size'
 
     def setUp(self):
@@ -263,6 +264,47 @@ class TestExcitonTB(unittest.TestCase):
                          'modulo_vector': np.array([4.355, -4.36358934])}
                   }
         }
+        self.matrix_dim_block_starts_tests = {
+            '1': {
+                '1.8': {'matrix_dim': 12,
+                        'block_start': [0, 0, 0, 0, 0, 0, 6, 6, 12]},
+                '2.0': {'matrix_dim': 12,
+                        'block_start': [0, 0, 0, 0, 0, 0, 6, 6, 12]},
+                '2.5': {'matrix_dim': 12,
+                        'block_start': [0, 0, 0, 0, 0, 0, 6, 6, 12]},
+                '3.0': {'matrix_dim': 18,
+                        'block_start': [0, 6, 6, 6, 6, 6, 12, 12, 18]},
+                '4.0': {'matrix_dim': 72,
+                        'block_start': [0, 8, 16, 24, 32, 40, 48, 56, 64]},
+            },
+            '2': {
+                '1.8': {'matrix_dim': 30,
+                        'block_start': [0]},
+                '2.0': {'matrix_dim': 30,
+                        'block_start': [0]},
+                '2.5': {'matrix_dim': 174,
+                        'block_start': [0]},
+                '3.0': {'matrix_dim': 594,
+                        'block_start': [0]},
+                '4.0': {'matrix_dim': 648,
+                        'block_start': [0]},
+            },
+            '3': {
+                '1.8': {'matrix_dim': 30,
+                        'block_start': [0, 30, 30, 30, 30, 30, 30, 30, 30]},
+                '2.0': {'matrix_dim': 30,
+                        'block_start': [0, 30, 30, 30, 30, 30, 30, 30, 30]},
+                '2.5': {'matrix_dim': 834,
+                        'block_start': [0, 174, 276, 378, 480,
+                                        582, 606, 708, 732]},
+                '3.0': {'matrix_dim': 5058,
+                        'block_start': [0, 594, 1188, 1782, 2376,
+                                        2970, 3420, 4014, 4464]},
+                '4.0': {'matrix_dim': 5832,
+                        'block_start': [0, 648, 1296, 1944, 2592,
+                                        3240, 3888, 4536, 5184]},
+            }
+        }
 
     def assertListAlmostEqual(self, list1, list2, places):
         self.assertEqual(len(list1), len(list2))
@@ -317,7 +359,7 @@ class TestExcitonTB(unittest.TestCase):
             test_path = os.path.join(self.test_input_folder, test_file)
             extb = ExcitonTB(test_path)
             for cutoff_str in self.energy_cutoffs:
-                matrix_elem_name = self.element_name_template.format(
+                matrix_elem_name = self.element_name_template_1.format(
                     test_tag,
                     cutoff_str
                 )
@@ -376,19 +418,30 @@ class TestExcitonTB(unittest.TestCase):
                     )
 
     def test_matrix_dim_and_block_starts(self):
-        for test_tag, test_dict in self.vector_modulo_tests.items():
+        for test_tag, test_dict in self.matrix_dim_block_starts_tests.items():
             test_file = self.test_input_template % test_tag
             test_path = os.path.join(self.test_input_folder, test_file)
             extb = ExcitonTB(test_path)
             for cutoff_str in self.energy_cutoffs:
-                matrix_elem_name = self.element_name_template.format(
+                matrix_elem_name = self.element_name_template_2.format(
                     test_tag,
                     cutoff_str
                 )
                 extb.create_matrix_element_hdf5(matrix_elem_name,
                                                 float(cutoff_str))
-                with File(matrix_elem_name, 'r') as f:
+                val_dict = test_dict[cutoff_str]
 
+                full_path = os.path.join(self.element_dir, matrix_elem_name)
+                with File(full_path, 'r') as f:
+                    test_data = extb.get_matrix_dim_and_block_starts(f)
+
+                test_mat_size = test_data[0][0]
+                val_mat_size = val_dict['matrix_dim']
+                self.assertEqual(test_mat_size, val_mat_size)
+
+                test_block_starts = test_data[1][0]
+                val_block_starts = val_dict['block_start']
+                self.assertListEqual(test_block_starts, val_block_starts)
 
 
 if __name__ == '__main__':
