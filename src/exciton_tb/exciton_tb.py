@@ -493,8 +493,9 @@ class ExcitonTB:
                 for idx in range(len(self.k_grid)):
                     v_num, c_num = n_val, n_con
                     if self.selective_mode:
-                        v_num_h5 = f['band_edges'][one_point_str % idx]['vb_num']
-                        c_num_h5 = f['band_edges'][one_point_str % idx]['cb_num']
+                        k_str = one_point_str % idx
+                        v_num_h5 = f['band_edges'][k_str]['vb_num']
+                        c_num_h5 = f['band_edges'][k_str]['cb_num']
                         v_num = int(np.array(v_num_h5))
                         c_num = int(np.array(c_num_h5))
                     if bool(element_storage['use_energy_cutoff']):
