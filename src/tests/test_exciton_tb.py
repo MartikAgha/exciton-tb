@@ -375,6 +375,21 @@ class TestExcitonTB(unittest.TestCase):
                         places=self.dp
                     )
 
+    def test_matrix_dim_and_block_starts(self):
+        for test_tag, test_dict in self.vector_modulo_tests.items():
+            test_file = self.test_input_template % test_tag
+            test_path = os.path.join(self.test_input_folder, test_file)
+            extb = ExcitonTB(test_path)
+            for cutoff_str in self.energy_cutoffs:
+                matrix_elem_name = self.element_name_template.format(
+                    test_tag,
+                    cutoff_str
+                )
+                extb.create_matrix_element_hdf5(matrix_elem_name,
+                                                float(cutoff_str))
+                with File(matrix_elem_name, 'r') as f:
+
+
 
 if __name__ == '__main__':
     unittest.main()

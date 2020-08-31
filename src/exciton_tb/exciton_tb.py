@@ -503,9 +503,10 @@ class ExcitonTB:
                             element_storage['cutoff_bands']['s0'][xs]['v_min']
                         ))
                         v_num = v_num - v_min
-                        c_num = int(np.array(
+                        c_max = int(np.array(
                             element_storage['cutoff_bands']['s0'][xs]['c_max']
                         ))
+                        c_num = c_max + 1
                     blocks.append(cumul_position)
                     cumul_position += v_num*c_num
                 # No spin-split system
@@ -528,14 +529,14 @@ class ExcitonTB:
                         v_min_1 = np.array(
                             element_storage['cutoff_bands']['s1'][xs]['v_min']
                         )
-                        c_num_0 = np.array(
+                        c_max_0 = np.array(
                             element_storage['cutoff_bands']['s0'][xs]['c_max']
                         )
-                        c_num_1 = np.array(
+                        c_max_1 = np.array(
                             element_storage['cutoff_bands']['s1'][xs]['c_max']
                         )
                         v_num = [v_num[0] - v_min_0, v_num[1] - v_min_1]
-                        c_num = [c_num_0, c_num_1]
+                        c_num = [c_max_0 + 1, c_max_1 + 1]
                     for s0 in range(2):
                         blocks[s0].append(cumul_position_split[s0])
                         cumul_position_split[s0] += v_num[s0]*c_num[s0]
