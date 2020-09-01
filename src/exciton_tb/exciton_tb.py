@@ -493,8 +493,9 @@ class ExcitonTB:
                 for idx in range(len(self.k_grid)):
                     v_num, c_num = n_val, n_con
                     if self.selective_mode:
-                        v_num_h5 = f['band_edges'][one_point_str % idx]['vb_num']
-                        c_num_h5 = f['band_edges'][one_point_str % idx]['cb_num']
+                        k_str = one_point_str % idx
+                        v_num_h5 = f['band_edges'][k_str]['vb_num']
+                        c_num_h5 = f['band_edges'][k_str]['cb_num']
                         v_num = int(np.array(v_num_h5))
                         c_num = int(np.array(c_num_h5))
                     if bool(element_storage['use_energy_cutoff']):
@@ -503,9 +504,10 @@ class ExcitonTB:
                             element_storage['cutoff_bands']['s0'][xs]['v_min']
                         ))
                         v_num = v_num - v_min
-                        c_num = int(np.array(
+                        c_max = int(np.array(
                             element_storage['cutoff_bands']['s0'][xs]['c_max']
                         ))
+                        c_num = c_max + 1
                     blocks.append(cumul_position)
                     cumul_position += v_num*c_num
                 # No spin-split system
@@ -516,8 +518,9 @@ class ExcitonTB:
                 for idx in range(len(self.k_grid)):
                     v_num, c_num = [n_val, n_val], [n_con, n_con]
                     if self.selective_mode:
-                        v_num_h5 = f['band_edges'][one_point_str % idx]['vb_num']
-                        c_num_h5 = f['band_edges'][one_point_str % idx]['cb_num']
+                        k_str = one_point_str % idx
+                        v_num_h5 = f['band_edges'][k_str]['vb_num']
+                        c_num_h5 = f['band_edges'][k_str]['cb_num']
                         v_num = list(np.array(v_num_h5))
                         c_num = list(np.array(c_num_h5))
                     if bool(element_storage['use_energy_cutoff']):
@@ -528,14 +531,14 @@ class ExcitonTB:
                         v_min_1 = np.array(
                             element_storage['cutoff_bands']['s1'][xs]['v_min']
                         )
-                        c_num_0 = np.array(
+                        c_max_0 = np.array(
                             element_storage['cutoff_bands']['s0'][xs]['c_max']
                         )
-                        c_num_1 = np.array(
+                        c_max_1 = np.array(
                             element_storage['cutoff_bands']['s1'][xs]['c_max']
                         )
                         v_num = [v_num[0] - v_min_0, v_num[1] - v_min_1]
-                        c_num = [c_num_0, c_num_1]
+                        c_num = [c_max_0 + 1, c_max_1 + 1]
                     for s0 in range(2):
                         blocks[s0].append(cumul_position_split[s0])
                         cumul_position_split[s0] += v_num[s0]*c_num[s0]
@@ -694,7 +697,7 @@ class ExcitonTB:
         min_energy = eigenvalues[edge_index] - energy_cutoff
 
         try:
-            cb_max = list(eigenvalues < max_energy).index(False)
+            cb_max = list(eigenvalues <= max_energy).index(False) - 1
         except ValueError:
             cb_max = len(eigenvalues) - 1
 
@@ -704,4 +707,3 @@ class ExcitonTB:
             vb_min = 0
 
         return cb_max, vb_min
-
