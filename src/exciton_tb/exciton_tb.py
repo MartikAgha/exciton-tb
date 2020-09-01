@@ -71,7 +71,7 @@ class ExcitonTB:
             self.file_storage['eigensystem']['convention']
         ))
 
-        if not self.n_spins in [1, 2]:
+        if self.n_spins not in [1, 2]:
             raise ValueError("eigensystem/n_spins must be either 1 or 2.")
 
         self.is_complex = bool(np.array(
@@ -109,7 +109,7 @@ class ExcitonTB:
 
         self.element_storage_name = None
 
-    def create_matrix_element_hdf5(self, storage_name):
+    def create_matrix_element_hdf5(self, storage_name, energy_cutoff=None):
         """
         Create matrix elements for the direct coulomb interaction
         :param storage_name: name for the hdf5 storage for matrix elements.
@@ -125,10 +125,16 @@ class ExcitonTB:
         # Containers for outputted data
         pos_list = self.r_grid
 
+        # Place holder function to get cutoff_band_min_maxes
+        cutoff_band_min_maxes = self.get_cutoff_band_min_maxes(energy_cutoff)
+
         with hp.File(self.element_storage_name, 'w') as f:
             eigvecs = self.get_preprocessed_eigenvectors()
             eh_int = self.get_eh_int(nat, nk, pos_list)
             f['VkM'] = eh_int
+            f['use_energy_cutoff'] = bool(energy_cutoff is not None)
+            f['energy_cutoff'] = 0 if energy_cutoff is None else energy_cutoff
+            cutoff_bands = f.create_group('cutoff_bands')
             nk_shift = nk if nk == 1 else 2*nk
 
             state_shift = self.n_spins*norb
@@ -137,14 +143,21 @@ class ExcitonTB:
                 # Two separate sets for up and down spin for non-exchange
                 # Assuming a Gamma-point calculation for now in supercell
                 spins = f.create_group(self.spin_str % s0)
+                spins_cutoff = cutoff_bands.create_group(self.spin_str % s0)
 
                 for m1, m2 in product(range(nk), range(nk)):
+                    ki_m = m1*nk + m2
+                    # For each k point, record the new c_num and v_max
+                    k_minmax = spins_cutoff.create_group('(%d,%d)' % (m1, m2))
+                    k_minmax['v_min'] = cutoff_band_min_maxes[s0][ki_m][0]
+                    k_minmax['c_max'] = cutoff_band_min_maxes[s0][ki_m][1]
+
                     for l1, l2 in product(range(nk), range(nk)):
+                        ki_l = l1*nk + l2
+
                         # Indices to navigate through k,k' data
                         ml1 = m1 - l1 + nk if nk > 1 else 0
                         ml2 = m2 - l2 + nk if nk > 1 else 0
-
-                        ki_m, ki_l = m1*nk + m2, l1*nk + l2
 
                         bandnum_m = self.get_number_conduction_valence_bands(
                             ki_m, s0
@@ -156,6 +169,18 @@ class ExcitonTB:
                         )
                         v_num_l, c_num_l = bandnum_l
 
+                        if energy_cutoff is not None:
+                            cutoff_minmax_m = cutoff_band_min_maxes[s0][ki_m]
+                            cutoff_minmax_l = cutoff_band_min_maxes[s0][ki_l]
+                            v_min_m = int(cutoff_minmax_m[0])
+                            c_num_m = int(cutoff_minmax_m[1]) + 1
+                            v_min_l = int(cutoff_minmax_l[0])
+                            c_num_l = int(cutoff_minmax_l[1]) + 1
+                            v_num_m = v_num_m - v_min_m
+                            v_num_l = v_num_l - v_min_l
+                        else:
+                            v_min_m, v_min_l = 0, 0
+
                         valence = np.zeros((nat, v_num_m*v_num_l),
                                            dtype='complex')
                         conduction = np.zeros((nat, c_num_m*c_num_l),
@@ -164,6 +189,7 @@ class ExcitonTB:
                         m_shf, l_shf = ki_m*state_shift, ki_l*state_shift
                         id_string = self.four_point_str % (m1, m2, l1, l2)
                         kpts = spins.create_group(id_string)
+
                         e_m, e_l = m_shf + s0*norb, l_shf + s0*norb
 
                         vb_iter = product(range(v_num_m), range(v_num_l))
@@ -172,8 +198,8 @@ class ExcitonTB:
                             # This is reversed compared to conduction band
                             vm_i = v2*v_num_m + v1
                             valence[:, vm_i] = reduced_tb_vec(
-                                eigvecs[e_l:e_l + norb, v2],
-                                eigvecs[e_m:e_m + norb, v1],
+                                eigvecs[e_l:e_l + norb, v_min_l + v2],
+                                eigvecs[e_m:e_m + norb, v_min_m + v1],
                                 nat,
                                 self.cumulative_positions
                             )
@@ -183,16 +209,16 @@ class ExcitonTB:
                             # for c1, k and c2, k' find matrix element
                             cm_i = c1*c_num_l + c2
                             conduction[:, cm_i] = reduced_tb_vec(
-                                eigvecs[e_m:e_m + norb, v_num_m + c1],
-                                eigvecs[e_l:e_l + norb, v_num_l + c2],
+                                eigvecs[e_m:e_m + norb, v_min_m + v_num_m + c1],
+                                eigvecs[e_l:e_l + norb, v_min_l + v_num_l + c2],
                                 nat,
                                 self.cumulative_positions
                             )
 
                         elem_shape = (c_num_m*c_num_l, v_num_m*v_num_l)
                         elems = kpts.create_dataset(name='mat_elems',
-                                                  shape=elem_shape,
-                                                  dtype='complex')
+                                                    shape=elem_shape,
+                                                    dtype='complex')
 
                         elems[:] = np.dot(np.array(conduction).T,
                                           np.dot(eh_int[ml1*nk_shift + ml2],
@@ -217,11 +243,12 @@ class ExcitonTB:
             element_storage = matrix_element_storage
 
         g = hp.File(element_storage, 'r')
+        energy_cutoff_bool = bool(np.array(g['use_energy_cutoff']))
         nk, nk2 = self.n_k, self.n_k**2
         n_val, n_con = self.n_val, self.n_con
         selective = self.selective_mode
 
-        mat_dim, blocks = self.get_matrix_dim_and_block_starts()
+        mat_dim, blocks = self.get_matrix_dim_and_block_starts(g)
         block_skip = n_con*n_val
         spin_shift = n_con + n_val
         bse_mat = [get_complex_zeros(mat_dim[i]) for i in range(self.n_spins)]
@@ -235,16 +262,36 @@ class ExcitonTB:
                                                         q_crys=q_zero,
                                                         direct=True)
             for s0 in range(self.n_spins):
-                k_skip = blocks[s0][k_i] if selective else k_i*block_skip
+                k_skip = k_i*block_skip
+
+                if selective or energy_cutoff_bool:
+                    k_skip = blocks[s0][k_i]
+
                 vnum1, cnum1 = self.get_number_conduction_valence_bands(
                     k_i, s0
                 )
+
+                # This should be defined before we change v_num and c_num to
+                # account for energy cutoff.
                 spin_skip = s0*(vnum1 + cnum1) if selective else s0*spin_shift
+
+                if energy_cutoff_bool:
+                    k_str = '(%d,%d)' % (m1, m2)
+                    s_str = self.spin_str % s0
+                    v_min = int(np.array(
+                        g['cutoff_bands'][s_str][k_str]['v_min']
+                    ))
+                    cnum1 = int(np.array(
+                        g['cutoff_bands'][s_str][k_str]['c_max']
+                    ))
+                    vnum1 = vnum1 - v_min
+                else:
+                    v_min = 0
 
                 for c, v in product(range(cnum1), range(vnum1)):
                     mat_idx = k_skip + c*vnum1 + v
-                    final_energy = energy_kq[vnum1 + c + spin_skip]
-                    init_energy = energy_k[v + spin_skip]
+                    final_energy = energy_kq[v_min + vnum1 + c + spin_skip]
+                    init_energy = energy_k[v_min + v + spin_skip]
                     energy_diff = final_energy - init_energy
                     bse_mat[s0][mat_idx, mat_idx] = energy_diff
 
@@ -261,8 +308,12 @@ class ExcitonTB:
                     s_str = self.spin_str % s0
                     scatter_int = np.array(g[s_str][k_str]['mat_elems'])
 
-                    k_skip = blocks[s0][k_i] if selective else k_i*block_skip
-                    kp_skip = blocks[s0][kp_i] if selective else kp_i*block_skip
+                    k_skip = k_i*block_skip
+                    kp_skip = kp_i*block_skip
+
+                    if selective or energy_cutoff_bool:
+                        k_skip = blocks[s0][k_i]
+                        kp_skip = blocks[s0][kp_i]
 
                     vnum1, cnum1 = self.get_number_conduction_valence_bands(
                         k_i, s0
@@ -270,6 +321,25 @@ class ExcitonTB:
                     vnum2, cnum2 = self.get_number_conduction_valence_bands(
                         kp_i, s0
                     )
+                    if energy_cutoff_bool:
+                        k_str = '(%d,%d)' % (m1, m2)
+                        kp_str = '(%d,%d)' % (l1, l2)
+
+                        v_min = np.array(
+                            g['cutoff_bands'][s_str][k_str]['v_min']
+                        )
+                        v_min_p = np.array(
+                            g['cutoff_bands'][s_str][kp_str]['v_min']
+                        )
+                        vnum1 = vnum1 - int(v_min)
+                        vnum2 = vnum2 - int(v_min_p)
+
+                        cnum1 = int(np.array(
+                            g['cutoff_bands'][s_str][k_str]['c_max']
+                        ))
+                        cnum2 = int(np.array(
+                            g['cutoff_bands'][s_str][kp_str]['c_max']
+                        ))
 
                     for c1, c2 in product(range(cnum1), range(cnum2)):
                         for v1, v2 in product(range(vnum1), range(vnum2)):
@@ -286,11 +356,11 @@ class ExcitonTB:
         # Decide whether to solve or output the hamiltonian to be
         # diagonalised elsewhere
         if solve:
-            exciton_eigsys = [napla.eigh(bse_mat[i]) for i in range(self.n_spins)]
+            bse_eigsys = [napla.eigh(bse_mat[i]) for i in range(self.n_spins)]
         else:
-            exciton_eigsys = bse_mat
+            bse_eigsys = bse_mat
 
-        return exciton_eigsys
+        return bse_eigsys
 
     def terminate_storage_usage(self):
         """Terminate the current usage session of the HDF5 file."""
@@ -400,7 +470,7 @@ class ExcitonTB:
 
         return fourier_term
 
-    def get_matrix_dim_and_block_starts(self):
+    def get_matrix_dim_and_block_starts(self, element_storage):
         """
         Get matrix dimensions.
         :param split:
@@ -415,14 +485,29 @@ class ExcitonTB:
         # bse matrix with kpoint blocks that have different number of bands
 
         one_point_str = self.one_point_str
-        if self.selective_mode:
+        selective_bool = (self.selective_mode or
+                          bool(element_storage['use_energy_cutoff']))
+        if selective_bool:
             if self.n_spins == 1:
                 blocks = []
                 for idx in range(len(self.k_grid)):
-                    v_num_h5 = f['band_edges'][one_point_str % idx]['vb_num']
-                    c_num_h5 = f['band_edges'][one_point_str % idx]['cb_num']
-                    v_num = int(np.array(v_num_h5))
-                    c_num = int(np.array(c_num_h5))
+                    v_num, c_num = n_val, n_con
+                    if self.selective_mode:
+                        k_str = one_point_str % idx
+                        v_num_h5 = f['band_edges'][k_str]['vb_num']
+                        c_num_h5 = f['band_edges'][k_str]['cb_num']
+                        v_num = int(np.array(v_num_h5))
+                        c_num = int(np.array(c_num_h5))
+                    if bool(element_storage['use_energy_cutoff']):
+                        xs = '(%d,%d)' % (idx % self.n_k, idx // self.n_k)
+                        v_min = int(np.array(
+                            element_storage['cutoff_bands']['s0'][xs]['v_min']
+                        ))
+                        v_num = v_num - v_min
+                        c_max = int(np.array(
+                            element_storage['cutoff_bands']['s0'][xs]['c_max']
+                        ))
+                        c_num = c_max + 1
                     blocks.append(cumul_position)
                     cumul_position += v_num*c_num
                 # No spin-split system
@@ -431,10 +516,29 @@ class ExcitonTB:
             else:
                 blocks = [[], []]
                 for idx in range(len(self.k_grid)):
-                    v_num_h5 = f['band_edges'][one_point_str % idx]['vb_num']
-                    c_num_h5 = f['band_edges'][one_point_str % idx]['cb_num']
-                    v_num = list(np.array(v_num_h5))
-                    c_num = list(np.array(c_num_h5))
+                    v_num, c_num = [n_val, n_val], [n_con, n_con]
+                    if self.selective_mode:
+                        k_str = one_point_str % idx
+                        v_num_h5 = f['band_edges'][k_str]['vb_num']
+                        c_num_h5 = f['band_edges'][k_str]['cb_num']
+                        v_num = list(np.array(v_num_h5))
+                        c_num = list(np.array(c_num_h5))
+                    if bool(element_storage['use_energy_cutoff']):
+                        xs = '(%d,%d)' % (idx % self.n_k, idx // self.n_k)
+                        v_min_0 = np.array(
+                            element_storage['cutoff_bands']['s0'][xs]['v_min']
+                        )
+                        v_min_1 = np.array(
+                            element_storage['cutoff_bands']['s1'][xs]['v_min']
+                        )
+                        c_max_0 = np.array(
+                            element_storage['cutoff_bands']['s0'][xs]['c_max']
+                        )
+                        c_max_1 = np.array(
+                            element_storage['cutoff_bands']['s1'][xs]['c_max']
+                        )
+                        v_num = [v_num[0] - v_min_0, v_num[1] - v_min_1]
+                        c_num = [c_max_0 + 1, c_max_1 + 1]
                     for s0 in range(2):
                         blocks[s0].append(cumul_position_split[s0])
                         cumul_position_split[s0] += v_num[s0]*c_num[s0]
@@ -545,3 +649,61 @@ class ExcitonTB:
 
         return eigenvectors
 
+    def get_cutoff_band_min_maxes(self, energy_cutoff):
+        """
+        Calculate an array of all minimum valence band indices and maximum
+        conduction band indices for each k point index and spin index
+        (if applicable).
+        @param energy_cutoff: Value with which to deteremine required bands.
+        @return:
+        """
+        eigvals = np.array(self.file_storage['eigensystem']['eigenvalues'])
+        cutoff_band_min_maxes = np.zeros((self.n_spins, self.n_k**2, 2))
+
+        for s0 in range(self.n_spins):
+            for m1, m2 in product(range(self.n_k), range(self.n_k)):
+                k_idx = m1*self.n_k + m2
+                v_num, c_num = self.get_number_conduction_valence_bands(k_idx,
+                                                                        s0)
+                if energy_cutoff is not None:
+                    eigvals_k = eigvals[k_idx]
+                    idx_1 = s0*(len(eigvals_k) - v_num - c_num)
+                    idx_2 = len(eigvals_k) if bool(s0) else v_num + c_num
+                    eigvals_k_s0 = eigvals_k[idx_1:idx_2]
+                    c_max, v_min = self.get_band_extrema(eigvals_k_s0,
+                                                         energy_cutoff,
+                                                         v_num)
+                    cutoff_band_min_maxes[s0][k_idx][0] = v_min
+                    cutoff_band_min_maxes[s0][k_idx][1] = c_max - v_num
+                else:
+                    cutoff_band_min_maxes[s0][k_idx][0] = 0
+                    cutoff_band_min_maxes[s0][k_idx][1] = c_num - 1
+
+        return cutoff_band_min_maxes
+
+    @staticmethod
+    def get_band_extrema(eigenvalues, energy_cutoff, edge_index):
+        """
+        Given an energy cutoff, finds the band indices that given the minimum
+        valence band within the cutoff below the conduction band, and the
+        maximum conduction band within a cutoff above the valence band.
+        @param eigenvalues: list of eigenvalues
+        @param energy_cutoff: energy to decide which bands we require
+        @param edge_index: index of the conduction band
+        @return:
+        """
+
+        max_energy = eigenvalues[edge_index - 1] + energy_cutoff
+        min_energy = eigenvalues[edge_index] - energy_cutoff
+
+        try:
+            cb_max = list(eigenvalues <= max_energy).index(False) - 1
+        except ValueError:
+            cb_max = len(eigenvalues) - 1
+
+        try:
+            vb_min = list(eigenvalues >= min_energy).index(True)
+        except ValueError:
+            vb_min = 0
+
+        return cb_max, vb_min
