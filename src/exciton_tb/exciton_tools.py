@@ -62,7 +62,7 @@ def get_cumulative_positions(pattern, norb):
         raise Exception("Pattern does not fit periodically in orbital set")
 
     cumul_term = lambda i: (i//p_len)*p_sum + sum(pattern[:(i % p_len) + 1])
-    cumulative_positions = [0] + [cumul_term(i) for i in range(norb)]
+    cumulative_positions = [0] + [int(cumul_term(i)) for i in range(norb)]
     return cumulative_positions
 
 def reduced_tb_vec(v1, v2, nat, cumul_pos):
