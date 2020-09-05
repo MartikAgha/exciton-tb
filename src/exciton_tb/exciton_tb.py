@@ -53,13 +53,10 @@ class ExcitonTB:
         self.file_storage = hp.File(hdf5_input, 'r')
         # Extract geometric information
         self.alat = float(np.array(self.file_storage['crystal']['alat']))
-
-        self.alat = float(np.array(self.file_storage['crystal']['alat']))
         self.a1 = np.array(self.file_storage['crystal']['avecs']['a1']).ravel()
         self.a2 = np.array(self.file_storage['crystal']['avecs']['a2']).ravel()
         self.b1 = np.array(self.file_storage['crystal']['gvecs']['b1']).ravel()
         self.b2 = np.array(self.file_storage['crystal']['gvecs']['b2']).ravel()
-
         self.motif_vectors = np.array(self.file_storage['crystal']['motif'])
 
         self.n_atoms = int(np.array(self.file_storage['crystal']['n_atoms']))
@@ -288,7 +285,7 @@ class ExcitonTB:
                     ))
                     cnum1 = int(np.array(
                         g['cutoff_bands'][s_str][k_str]['c_max']
-                    ))
+                    )) + 1
                     vnum1 = vnum1 - v_min
                 else:
                     v_min = 0
@@ -341,10 +338,10 @@ class ExcitonTB:
 
                         cnum1 = int(np.array(
                             g['cutoff_bands'][s_str][k_str]['c_max']
-                        ))
+                        )) + 1
                         cnum2 = int(np.array(
                             g['cutoff_bands'][s_str][kp_str]['c_max']
-                        ))
+                        )) + 1
 
                     for c1, c2 in product(range(cnum1), range(cnum2)):
                         for v1, v2 in product(range(vnum1), range(vnum2)):
