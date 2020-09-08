@@ -6,22 +6,28 @@ import scipy as sp
 recentering_precision = 1e-7
 reach_factor = 10
 
+
 def get_complex_zeros(square_dimension):
     return sp.zeros((square_dimension, square_dimension), dtype=complex)
 
+
 def cplx_exp_dot(vec1, vec2):
     return np.exp(-1j*np.dot(vec1, vec2))
+
 
 def conj_dot(vec1, vec2):
     """Returns complex vector inner product <vec1|vec2>"""
     return np.dot(np.conj(vec1.T), vec2)
 
+
 def hermite_mat_prod(mat_1, mat_2):
     return sp.mat(np.dot(np.conj(mat_1.T), mat_2))
+
 
 def recentre(m1, m2, nk):
     """Given corner-centred coords, finds midpoint-centred coords."""
     return [m1 - int(m1 > nk // 2)*nk, m2 - int(m2 > nk // 2)*nk]
+
 
 def recentre_continuous(r, b1, b2):
     threshold = 0.5 + recentering_precision
@@ -29,10 +35,12 @@ def recentre_continuous(r, b1, b2):
     x1p, x2p = x1 - float(int(x1 > threshold)), x2 - float(int(x2 > threshold))
     return x1p, x2p
 
+
 def recentre_idx(radius, i, j, nc, a1, a2):
     """Given corner-cetred indices, create spatial vector."""
     rec_idx = recentre((i % nc - j % nc) % nc, (i//nc - j//nc) % nc, nc)
     return radius + rec_idx[0]*a1 + rec_idx[1]*a2
+
 
 def fix_consistent_gauge(vector):
     """Fix a vector with a consistent gauge depending on its elements"""
@@ -40,6 +48,7 @@ def fix_consistent_gauge(vector):
     quotient_phase = full_sum/np.abs(full_sum)
     fixed_vector = vector/quotient_phase
     return fixed_vector
+
 
 def get_supercell_positions(a1, a2, nk, cell_wise_centering=True):
     position_list = []
@@ -53,17 +62,19 @@ def get_supercell_positions(a1, a2, nk, cell_wise_centering=True):
         position_list.append(r_position)
     return position_list
 
+
 def get_cumulative_positions(pattern, norb):
 
     p_sum = sum(pattern)
     p_len = len(pattern)
 
     if norb % p_sum != 0:
-        raise Exception("Pattern does not fit periodically in orbital set")
+        raise ValueError("Pattern does not fit periodically in orbital set")
 
     cumul_term = lambda i: (i//p_len)*p_sum + sum(pattern[:(i % p_len) + 1])
-    cumulative_positions = [0] + [cumul_term(i) for i in range(norb)]
+    cumulative_positions = [0] + [int(cumul_term(i)) for i in range(norb)]
     return cumulative_positions
+
 
 def reduced_tb_vec(v1, v2, nat, cumul_pos):
     """
@@ -84,6 +95,7 @@ def reduced_tb_vec(v1, v2, nat, cumul_pos):
 
     return reduced_vec
 
+
 def get_band_extrema(eigensystem, energy_limit, cell_size):
 
     max_energy_1 = eigensystem[0][0][cell_size ** 2 - 1] + energy_limit
@@ -97,6 +109,7 @@ def get_band_extrema(eigensystem, energy_limit, cell_size):
     vb_min_2 = list(eigensystem[1][0] >= min_energy_2).index(True)
 
     return cb_max_1, cb_max_2, vb_min_1, vb_min_2
+
 
 def extract_exciton_dos(excitons,
                         frequencies,
@@ -129,6 +142,7 @@ def extract_exciton_dos(excitons,
                 density_of_states[idx2] += smearing
     return density_of_states
 
+
 def convert_eigenvector_convention(eigenvectors, kpt, motif, orb_pattern):
     """
     Change eigenvector block at a k point from convention II to convention I.
@@ -145,6 +159,7 @@ def convert_eigenvector_convention(eigenvectors, kpt, motif, orb_pattern):
     phase_array = np.array(list(chain(*phase_nested_list)))
     eigenvectors_rotate = np.multiply(phase_array.reshape(-1, 1), eigenvectors)
     return eigenvectors_rotate
+
 
 def convert_all_eigenvectors(eigenvectors,
                              k_grid,
@@ -177,5 +192,3 @@ def convert_all_eigenvectors(eigenvectors,
             eigenvectors_rotated[j1:j2, :] = eig_block_rotate
 
     return eigenvectors_rotated
-
-
