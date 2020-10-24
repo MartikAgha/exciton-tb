@@ -121,3 +121,13 @@ limited subset of bands. set to True or False.
         - 'vb_num': number of valence bands
 
         - 'cb_num': number of conduction bands
+  
+- 'velocity_matrix': (Optional) If the conductivity of imaginary part of the 
+                     dielectric function is required then the velocity matrices,
+                     will be placed here. The velocity matrix must be calculated
+                     at the same k points that are used in the calculation, and 
+                     included in this file in the same order as the k points 
+                     appear in 'eigensystem/k_grid'
+
+    - 'k(idx)' Place velocity matrix here. idx of the kpt in the k_grid.  
+
