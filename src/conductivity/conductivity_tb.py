@@ -3,7 +3,8 @@ from itertools import product
 import numpy as np
 
 from .conductivity_tools import velocity_matrix_element, \
-                                get_broadening_function
+                                get_broadening_function, \
+                                polarisation_str_to_vector
 
 e_charge_2_over_epsilon0 = 180.79096
 
@@ -41,6 +42,20 @@ class ConductivityTB:
         else:
             vel_mat = np.array(self.file_storage[self.mat_str][k_str])
         return vel_mat
+
+    def construct_position_dipole_matrix(self, polarisation='x'):
+        pol_vector = polarisation_str_to_vector(polarisation=polarisation)
+        orb_pattern = self.exciton_obj.orbital_pattern
+        motif = self.exciton_obj.motif_vectors
+        diag_list = []
+        for idx, vector in enumerate(motif):
+            dot_prod = np.dot(pol_vector, vector)
+            num_orbitals = orb_pattern[idx % len(orb_pattern)]
+            for _ in range(len(num_orbitals)):
+                diag_list.append(dot_prod)
+
+        position_dipole_matrix = np.diag(diag_list)
+        return position_dipole_matrix
 
     def non_interacting_conductivity(self,
                                      sigma=0.04,

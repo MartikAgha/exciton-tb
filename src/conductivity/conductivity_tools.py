@@ -34,3 +34,14 @@ def residual_term(vec_c, vec_v, val_c, val_v, motif_polarised):
     position_matrix_element = np.dot(np.conj(vec_c), vec_v_times_motif)
     residual = prefactor*position_matrix_element
     return residual
+
+def polarisation_str_to_vector(polarisation):
+    r2 = np.sqrt(2)
+    str_dict_to_pol = {'x': [1, 0], 'y': [0, 1],
+                       'lh': [r2, 1j*r2], 'rh': [r2, -1j*r2]}
+    try:
+        pol_vector = np.array(str_dict_to_pol[polarisation.lower()])
+    except KeyError:
+        pol_vector = np.array(str_dict_to_pol['x'])
+
+    return pol_vector
