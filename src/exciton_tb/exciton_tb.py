@@ -9,7 +9,8 @@ import numpy.linalg as napla
 from .exciton_tools import get_complex_zeros, cplx_exp_dot, \
                            get_cumulative_positions, reduced_tb_vec, \
                            recentre_continuous, get_supercell_positions, \
-                           fix_consistent_gauge, convert_all_eigenvectors
+                           fix_consistent_gauge, convert_all_eigenvectors, \
+                           unconvert_all_eigenvectors
 from .exciton_interactions import interaction_potential
 
 
@@ -64,6 +65,7 @@ class ExcitonTB:
         self.n_k = int(np.array(self.file_storage['eigensystem']['n_k']))
         self.n_val = int(np.array(self.file_storage['eigensystem']['n_val']))
         self.n_con = int(np.array(self.file_storage['eigensystem']['n_con']))
+
         self.n_spins = int(np.array(
             self.file_storage['eigensystem']['n_spins']
         ))
@@ -90,9 +92,9 @@ class ExcitonTB:
         self.trunc_alat = float(np.array(
             self.file_storage['crystal']['trunc_alat']
         ))
-        self.orb_pattern = list(np.array(
+        self.orb_pattern = list(map(int, list(np.array(
             self.file_storage['crystal']['orb_pattern']).ravel()
-        )
+        )))
         self.cumulative_positions = get_cumulative_positions(self.orb_pattern,
                                                              self.n_orbs)
 
@@ -160,6 +162,8 @@ class ExcitonTB:
                         # Indices to navigate through k,k' data
                         ml1 = m1 - l1 + nk if nk > 1 else 0
                         ml2 = m2 - l2 + nk if nk > 1 else 0
+                        # ml1 = (m1 - l1) % nk
+                        # ml2 = (m2 - l2) % nk
 
                         bandnum_m = self.get_number_conduction_valence_bands(
                             ki_m, s0
@@ -419,6 +423,16 @@ class ExcitonTB:
                                                           pos_idx=pos_idx,
                                                           kdiff=kdiff)
                     eh_int[ml1*2*nk + ml2] += mat_term
+            # eh_int = list(np.zeros((nk2, nat, nat), dtype=complex))
+            # for ml1, ml2 in product(range(nk), range(nk)):
+            #     kdiff = ml1*b1 + ml2*b2
+            #     for r1, r2 in product(range(nk), range(nk)):
+            #         pos_idx = r1*nk + r2
+            #         pos = pos_list[r1*nk + r2]
+            #         mat_term = self.create_fourier_matrix(pos=pos,
+            #                                               pos_idx=pos_idx,
+            #                                               kdiff=kdiff)
+            #         eh_int[ml1*nk + ml2] += mat_term
         return eh_int
 
     def get_vector_diff_modulo_cell(self, i, j):
@@ -646,9 +660,15 @@ class ExcitonTB:
                                                     self.orb_pattern,
                                                     self.n_orbs,
                                                     bool(self.n_spins == 2))
+        # elif self.convention == 1:
         elif not self.convention == 1:
+            # eigenvectors = unconvert_all_eigenvectors(eigenvectors,
+            #                                           self.k_grid,
+            #                                           self.motif_vectors,
+            #                                           self.orb_pattern,
+            #                                           self.n_orbs,
+            #                                           bool(self.n_spins == 2))
             raise ValueError("Convention should be 1 or 2.")
-
         return eigenvectors
 
     def get_cutoff_band_min_maxes(self, energy_cutoff):

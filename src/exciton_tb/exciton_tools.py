@@ -1,14 +1,13 @@
 from itertools import product, chain
 
 import numpy as np
-import scipy as sp
 
 recentering_precision = 1e-7
 reach_factor = 10
 
 
 def get_complex_zeros(square_dimension):
-    return sp.zeros((square_dimension, square_dimension), dtype=complex)
+    return np.zeros((square_dimension, square_dimension), dtype=complex)
 
 
 def cplx_exp_dot(vec1, vec2):
@@ -21,7 +20,7 @@ def conj_dot(vec1, vec2):
 
 
 def hermite_mat_prod(mat_1, mat_2):
-    return sp.mat(np.dot(np.conj(mat_1.T), mat_2))
+    return np.mat(np.dot(np.conj(mat_1.T), mat_2))
 
 
 def recentre(m1, m2, nk):
@@ -30,9 +29,9 @@ def recentre(m1, m2, nk):
 
 
 def recentre_continuous(r, b1, b2):
-    threshold = 0.5 + recentering_precision
+    threshold = 0.5 - recentering_precision
     x1, x2 = np.dot(b1, r)/2/np.pi, np.dot(b2, r)/2/np.pi
-    x1p, x2p = x1 - float(int(x1 > threshold)), x2 - float(int(x2 > threshold))
+    x1p, x2p = x1 - float(int(x1 >= threshold)), x2 - float(int(x2 >= threshold))
     return x1p, x2p
 
 
@@ -192,3 +191,56 @@ def convert_all_eigenvectors(eigenvectors,
             eigenvectors_rotated[j1:j2, :] = eig_block_rotate
 
     return eigenvectors_rotated
+
+
+
+def unconvert_eigenvector_convention(eigenvectors, kpt, motif, orb_pattern):
+    """
+    Change eigenvector block at a k point from convention II to convention I.
+    :param eigenvectors: Matrix of eigenvectors
+    :param kpt: k point eigenvectors are calculated at
+    :param motif: list of motif vectors in order of
+    :param orbital_pattern: orbital pattern of number of orbitals per position
+    :return:
+    """
+    nat = len(motif)
+    phase_vector = [np.exp(1j*np.dot(kpt, vector)) for vector in motif]
+    full_pattern = [orb_pattern[i % len(orb_pattern)] for i in range(nat)]
+    phase_nested_list = [[phase_vector[i]]*full_pattern[i] for i in range(nat)]
+    phase_array = np.array(list(chain(*phase_nested_list)))
+    eigenvectors_rotate = np.multiply(phase_array.reshape(-1, 1), eigenvectors)
+    return eigenvectors_rotate
+
+
+def unconvert_all_eigenvectors(eigenvectors,
+                               k_grid,
+                               motif,
+                               orb_pattern,
+                               nbasis,
+                               spin_split=False):
+    """
+    Change all eigenvectors from convention II to convention I.
+    :param eigenvectors: Matrix of eigenvectors
+    :param k_grid: k points that eigenvectors are calculated at
+    :param motif: list of motif vectors in order of
+    :param orbital_pattern: orbital pattern of number of orbitals per position
+    :param nbasis: number of elements in the basis
+    :param spin_split: True if system is spin divided.
+    :return:
+    """
+    eigenvectors_rotated = np.zeros(eigenvectors.shape, dtype=complex)
+    for idx, kpt in enumerate(k_grid):
+        for s in range(2):
+            if s == 1 and not spin_split:
+                continue
+            j1 = idx*nbasis + s*nbasis
+            j2 = (idx + 1)*nbasis - int(spin_split)*(1 - s)*nbasis
+            eig_block = eigenvectors[j1:j2, :]
+            eig_block_rotate = unconvert_eigenvector_convention(eig_block,
+                                                                kpt,
+                                                                motif,
+                                                                orb_pattern)
+            eigenvectors_rotated[j1:j2, :] = eig_block_rotate
+
+    return eigenvectors_rotated
+
