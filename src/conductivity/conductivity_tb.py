@@ -38,22 +38,22 @@ class ConductivityTB:
         """
         k_str = self.kpt_str % k_idx
         if self.exciton_obj.is_complex:
+            vel_mat = np.array(self.file_storage[self.mat_str][k_str])
+        else:
             vel_re = np.array(self.file_storage[self.mat_str][k_str]['real'])
             vel_im = np.array(self.file_storage[self.mat_str][k_str]['imag'])
             vel_mat = vel_re + 1j*vel_im
-        else:
-            vel_mat = np.array(self.file_storage[self.mat_str][k_str])
         return vel_mat
 
     def construct_position_dipole_matrix(self, polarisation='x'):
         pol_vector = polarisation_str_to_vector(polarisation=polarisation)
-        orb_pattern = self.exciton_obj.orbital_pattern
+        orb_pattern = self.exciton_obj.orb_pattern
         motif = self.exciton_obj.motif_vectors
         diag_list = []
         for idx, vector in enumerate(motif):
             dot_prod = np.dot(pol_vector, vector)
             num_orbitals = orb_pattern[idx % len(orb_pattern)]
-            for _ in range(len(num_orbitals)):
+            for _ in range(num_orbitals):
                 diag_list.append(dot_prod)
 
         position_dipole_matrix = np.diag(diag_list)
