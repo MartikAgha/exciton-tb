@@ -45,3 +45,10 @@ def polarisation_str_to_vector(polarisation):
         pol_vector = np.array(str_dict_to_pol['x'])
 
     return pol_vector
+
+def get_position_dipole_element(vec_c, vec_v, val_c, val_v, dipole_matrix):
+    prefactor = val_v - val_c
+    vec_v_times_motif = np.multiply(dipole_matrix, vec_v)
+    position_matrix_element = np.dot(np.conj(vec_c), vec_v_times_motif)
+    position_dipole_element = 1j*prefactor*position_matrix_element
+    return position_dipole_element
