@@ -11,6 +11,7 @@ e_charge_2_over_epsilon0 = 180.79096
 class ConductivityTB:
 
     kpt_str = 'k(%d)'
+    mat_str = 'velocity_matrix'
     reach_multiplier = 10
 
     def __init__(self, exciton_obj=None):
@@ -33,7 +34,12 @@ class ConductivityTB:
         :return: velocity_matrix
         """
         k_str = self.kpt_str % k_idx
-        vel_mat = np.array(self.file_storage['velocity_matrix'][k_str])
+        if self.exciton_obj.is_complex:
+            vel_re = np.array(self.file_storage[self.mat_str][k_str]['real'])
+            vel_im = np.array(self.file_storage[self.mat_str][k_str]['imag'])
+            vel_mat = vel_re + 1j*vel_im
+        else:
+            vel_mat = np.array(self.file_storage[self.mat_str][k_str])
         return vel_mat
 
     def non_interacting_conductivity(self,
