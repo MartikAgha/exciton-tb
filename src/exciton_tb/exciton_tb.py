@@ -300,7 +300,6 @@ class ExcitonTB:
                     init_energy = energy_k[v_min + v + spin_skip]
                     energy_diff = final_energy - init_energy
                     bse_mat[s0][mat_idx, mat_idx] = energy_diff
-                    print(energy_diff)
 
             # No longer needed
             del energy_k, energy_kq
