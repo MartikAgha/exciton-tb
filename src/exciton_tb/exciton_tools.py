@@ -244,3 +244,29 @@ def unconvert_all_eigenvectors(eigenvectors,
 
     return eigenvectors_rotated
 
+def find_repeats(e):
+    elem, rep = np.unique(np.round(e, decimals=8), return_counts=True)
+    repeats = elem[np.where(rep > 1)]
+    return repeats
+
+def orthogonalize_eigenvecs(e, v):
+    e = np.round(e, decimals=8)
+    vo = v.copy() # orthogonalized eigenvector matrix
+    nk = v.shape[0] / v.shape[1] # number of k-points
+    nb = v.shape[1] # number of bands
+    for i in range(int(nk)): # for every k-point
+        # find indices of degenerate eigenvalues
+        ei = e[i, :] if len(e.shape) > 1 else e
+        rep = find_repeats(ei)
+        for j in range(len(rep)):
+            inds = np.array(np.where(ei == rep[j]))[0]
+            # assumption: only have doubly degenerate eigenvalues
+            # take first and second vector
+            v1 = v[nb*i: nb*(i + 1), inds[0]]
+            v2 = v[nb*i: nb*(i + 1), inds[1]]
+            # make new second vector
+            v2o = v2 - np.dot(v1.conjugate(), v2) * v1
+            v2o = v2o / np.sqrt(np.dot(v2o.conjugate(), v2o))
+            # write it into matrix vo
+            vo[nb*i: nb*(i + 1), inds[1]] = v2o
+    return vo

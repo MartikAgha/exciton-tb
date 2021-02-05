@@ -10,7 +10,7 @@ from .exciton_tools import get_complex_zeros, cplx_exp_dot, \
                            get_cumulative_positions, reduced_tb_vec, \
                            recentre_continuous, get_supercell_positions, \
                            fix_consistent_gauge, convert_all_eigenvectors, \
-                           unconvert_all_eigenvectors
+                           orthogonalize_eigenvecs
 from .exciton_interactions import interaction_potential
 
 
@@ -669,6 +669,9 @@ class ExcitonTB:
             #                                           self.n_orbs,
             #                                           bool(self.n_spins == 2))
             raise ValueError("Convention should be 1 or 2.")
+
+        eigenvalues = np.array(f['eigensystem']['eigenvalues'])
+        eigenvectors = orthogonalize_eigenvecs(eigenvalues, eigenvectors)
         return eigenvectors
 
     def get_cutoff_band_min_maxes(self, energy_cutoff):
