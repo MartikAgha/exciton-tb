@@ -732,3 +732,27 @@ class ExcitonTB:
             vb_min = 0
 
         return cb_max, vb_min
+
+    def get_cutoff_bands_info(self, energy_cutoff):
+        """
+        Obtain the information about the bands used in the cutoff
+        (or not cutoff) calculation
+        @param energy_cutoff:
+        @return: cutoff_bands_info
+        """
+        cutoff_bands_info = [[] for i in range(self.n_spins)]
+        cutoff_band_min_maxes = self.get_cutoff_band_min_maxes(energy_cutoff)
+        for s0 in range(self.n_spins):
+            for idx, kpt in enumerate(self.k_grid):
+                nval, ncon = self.get_number_conduction_valence_bands(s0, idx)
+                vmin_cmax = cutoff_band_min_maxes[0][idx]
+                avail_vb = range(int(vmin_cmax[0]), nval)
+                avail_cb = range(int(vmin_cmax[1]) + 1)
+                # Should ensure that this ordering matches that of the
+                # Hamiltonian construction
+                kpt_dict = {}
+                combos = [(c, v) for c, v in product(avail_cb, avail_vb)]
+                kpt_dict['transitions'] = combos
+                kpt_dict['k_point'] = kpt
+                cutoff_bands_info[s0].append([idx, kpt_dict])
+        return cutoff_bands_info
