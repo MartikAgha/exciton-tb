@@ -171,8 +171,7 @@ class ConductivityTB:
         position_dipole_matrix = self.construct_position_dipole_matrix()
 
         n_shift = self.n_spins*self.n_orbs
-
-        cutoff_info = self.exciton_obj.get_cutoff_bands_info()
+        cutoff_band_min_maxes = self.exciton_obj.get_cutoff_band_min_maxes()
         # Construct vector of velocity matrix elements to dot with the
         # bse eigenvector.
         velocity_element_lists = []
@@ -184,6 +183,11 @@ class ConductivityTB:
                     idx_1, s0
                 )
                 v_num, c_num = bands
+                v_min = 0
+                if self.exciton_obj.energy_cutoff is not None:
+                    v_min = int(cutoff_band_min_maxes[s0][idx_1][0])
+                    c_num = int(cutoff_band_min_maxes[s0][idx_1][1]) + 1
+                    v_num = v_num - v_min
                 j1 = n_shift*idx_1 + s0*self.n_orbs
                 j2 = j1 + n_shift - (1 - s0)*self.n_orbs*(self.n_spins - 1)
                 eigvecs = np.array(
@@ -196,14 +200,15 @@ class ConductivityTB:
                 else:
                     eigvals = None
                 for c, v in product(range(c_num), range(v_num)):
-                    cb_vector = eigvecs[:, v_num + c]
-                    vb_vector = eigvecs[:, v]
+                    cb_vector = eigvecs[:, v_min + v_num + c]
+                    vb_vector = eigvecs[:, v_min + v]
 
                     matrix_elem = velocity_matrix_element(cb_vector,
                                                           vb_vector,
                                                           velocity_matrix)
                     if self.use_dipole_term:
-                        cb_energy, vb_energy = eigvals[v_num + c], eigvals[v]
+                        cb_energy = eigvals[v_min + v_num + c]
+                        vb_energy = eigvals[v_min + v]
                         position_dipole_term = get_position_dipole_element(
                             vb_vector,
                             cb_vector,

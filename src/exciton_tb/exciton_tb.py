@@ -679,7 +679,7 @@ class ExcitonTB:
         eigenvectors = orthogonalize_eigenvecs(eigenvalues, eigenvectors)
         return eigenvectors
 
-    def get_cutoff_band_min_maxes(self, energy_cutoff):
+    def get_cutoff_band_min_maxes(self, energy_cutoff=None):
         """
         Calculate an array of all minimum valence band indices and maximum
         conduction band indices for each k point index and spin index
@@ -687,6 +687,8 @@ class ExcitonTB:
         @param energy_cutoff: Value with which to deteremine required bands.
         @return:
         """
+        if energy_cutoff is None:
+            energy_cutoff = self.energy_cutoff
         eigvals = np.array(self.file_storage['eigensystem']['eigenvalues'])
         cutoff_band_min_maxes = np.zeros((self.n_spins, self.n_k**2, 2))
 
