@@ -112,6 +112,10 @@ class ExcitonTB:
             os.mkdir(self.matrix_element_dir)
 
         self.element_storage_name = None
+        self.energy_cutoff = None
+
+    def set_energy_cutoff(self, energy_cutoff):
+        self.energy_cutoff = energy_cutoff
 
     def create_matrix_element_hdf5(self, storage_name, energy_cutoff=None):
         """
@@ -130,6 +134,7 @@ class ExcitonTB:
         pos_list = self.r_grid
 
         # Place holder function to get cutoff_band_min_maxes
+        self.set_energy_cutoff(energy_cutoff)
         cutoff_band_min_maxes = self.get_cutoff_band_min_maxes(energy_cutoff)
 
         with hp.File(self.element_storage_name, 'w') as f:
@@ -674,7 +679,7 @@ class ExcitonTB:
         eigenvectors = orthogonalize_eigenvecs(eigenvalues, eigenvectors)
         return eigenvectors
 
-    def get_cutoff_band_min_maxes(self, energy_cutoff):
+    def get_cutoff_band_min_maxes(self, energy_cutoff=None):
         """
         Calculate an array of all minimum valence band indices and maximum
         conduction band indices for each k point index and spin index
@@ -682,6 +687,8 @@ class ExcitonTB:
         @param energy_cutoff: Value with which to deteremine required bands.
         @return:
         """
+        if energy_cutoff is None:
+            energy_cutoff = self.energy_cutoff
         eigvals = np.array(self.file_storage['eigensystem']['eigenvalues'])
         cutoff_band_min_maxes = np.zeros((self.n_spins, self.n_k**2, 2))
 
@@ -732,3 +739,29 @@ class ExcitonTB:
             vb_min = 0
 
         return cb_max, vb_min
+
+    def get_cutoff_bands_info(self, energy_cutoff=None):
+        """
+        Obtain the information about the bands used in the cutoff
+        (or not cutoff) calculation
+        @param energy_cutoff:
+        @return: cutoff_bands_info
+        """
+        if energy_cutoff is None:
+            energy_cutoff = self.energy_cutoff
+        cutoff_bands_info = [[] for i in range(self.n_spins)]
+        cutoff_band_min_maxes = self.get_cutoff_band_min_maxes(energy_cutoff)
+        for s0 in range(self.n_spins):
+            for idx, kpt in enumerate(self.k_grid):
+                nval, ncon = self.get_number_conduction_valence_bands(s0, idx)
+                vmin_cmax = cutoff_band_min_maxes[0][idx]
+                avail_vb = range(int(vmin_cmax[0]), nval)
+                avail_cb = range(int(vmin_cmax[1]) + 1)
+                # Should ensure that this ordering matches that of the
+                # Hamiltonian construction
+                kpt_dict = {}
+                combos = [(c, v) for c, v in product(avail_cb, avail_vb)]
+                kpt_dict['transitions'] = combos
+                kpt_dict['k_point'] = kpt
+                cutoff_bands_info[s0].append([idx, kpt_dict])
+        return cutoff_bands_info

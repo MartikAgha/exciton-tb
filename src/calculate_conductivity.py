@@ -11,6 +11,7 @@ def get_argparser():
     parser.add_argument('input_hdf5', type=str)
     parser.add_argument('-o', '--output-name', default=None, type=str)
     parser.add_argument('-t', '--terminal-output', action='store_true')
+    parser.add_argument('-ec', '--energy-cutoff', default=None, type=float)
     parser.add_argument('-vm', '--velocity-matrix', default=None)
     parser.add_argument('-rpa', '--use-rpa', action='store_true')
     parser.add_argument('-i', '--interaction', default='keldysh', type=str)
@@ -45,7 +46,8 @@ def main():
             broadening=args.broadening
         )
     else:
-        exc_tb.create_matrix_element_hdf5(args.matrix_element)
+        exc_tb.create_matrix_element_hdf5(args.matrix_element,
+                                          energy_cutoff=args.energy_cutoff)
         cond_tb = ConductivityTB(exciton_obj=exc_tb)
         frequencies, conductivity = cond_tb.interacting_conductivity(
             sigma=args.broadening_width,
