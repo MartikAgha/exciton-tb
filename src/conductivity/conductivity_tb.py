@@ -172,6 +172,7 @@ class ConductivityTB:
 
         n_shift = self.n_spins*self.n_orbs
 
+        cutoff_info = self.exciton_obj.get_cutoff_bands_info()
         # Construct vector of velocity matrix elements to dot with the
         # bse eigenvector.
         velocity_element_lists = []
@@ -197,12 +198,12 @@ class ConductivityTB:
                 for c, v in product(range(c_num), range(v_num)):
                     cb_vector = eigvecs[:, v_num + c]
                     vb_vector = eigvecs[:, v]
-                    cb_energy, vb_energy = eigvals[v_num + c], eigvals[v]
 
                     matrix_elem = velocity_matrix_element(cb_vector,
                                                           vb_vector,
                                                           velocity_matrix)
                     if self.use_dipole_term:
+                        cb_energy, vb_energy = eigvals[v_num + c], eigvals[v]
                         position_dipole_term = get_position_dipole_element(
                             vb_vector,
                             cb_vector,

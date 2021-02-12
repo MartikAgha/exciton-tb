@@ -112,6 +112,10 @@ class ExcitonTB:
             os.mkdir(self.matrix_element_dir)
 
         self.element_storage_name = None
+        self.energy_cutoff = None
+
+    def set_energy_cutoff(self, energy_cutoff):
+        self.energy_cutoff = energy_cutoff
 
     def create_matrix_element_hdf5(self, storage_name, energy_cutoff=None):
         """
@@ -130,6 +134,7 @@ class ExcitonTB:
         pos_list = self.r_grid
 
         # Place holder function to get cutoff_band_min_maxes
+        self.set_energy_cutoff(energy_cutoff)
         cutoff_band_min_maxes = self.get_cutoff_band_min_maxes(energy_cutoff)
 
         with hp.File(self.element_storage_name, 'w') as f:
@@ -733,13 +738,15 @@ class ExcitonTB:
 
         return cb_max, vb_min
 
-    def get_cutoff_bands_info(self, energy_cutoff):
+    def get_cutoff_bands_info(self, energy_cutoff=None):
         """
         Obtain the information about the bands used in the cutoff
         (or not cutoff) calculation
         @param energy_cutoff:
         @return: cutoff_bands_info
         """
+        if energy_cutoff is None:
+            energy_cutoff = self.energy_cutoff
         cutoff_bands_info = [[] for i in range(self.n_spins)]
         cutoff_band_min_maxes = self.get_cutoff_band_min_maxes(energy_cutoff)
         for s0 in range(self.n_spins):
