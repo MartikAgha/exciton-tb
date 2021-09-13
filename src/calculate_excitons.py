@@ -13,6 +13,7 @@ def get_argparser():
     parser.add_argument('-t', '--terminal-output', action='store_true')
     parser.add_argument('-i', '--interaction', default='keldysh', type=str)
     parser.add_argument('-dos', '--exciton-dos', action='store_true')
+    parser.add_argument('-ec', '--energy-cutoff', default=None, type=float)
     parser.add_argument('-fmin', '--frequency-min', default=0.0, type=float)
     parser.add_argument('-fmax', '--frequency-max', default=6.0, type=float)
     parser.add_argument('-fnum', '--frequency-num', default=1000, type=int)
@@ -33,8 +34,11 @@ def main():
     freq_range = (args.frequency_min, args.frequency_max, args.frequency_num)
 
     exc_tb = ExcitonTB(args.input_hdf5)
-    exc_tb.create_matrix_element_hdf5(storage_name=args.matrix_element)
+    exc_tb.create_matrix_element_hdf5(storage_name=args.matrix_element,
+                                      energy_cutoff=args.energy_cutoff)
     output = exc_tb.get_bse_eigensystem_direct(solve=True)
+    n_spins = exc_tb.n_spins
+    cutoff_bands_info = exc_tb.get_cutoff_bands_info(args.energy_cutoff)
     exc_tb.terminate_storage_usage()
 
     split = bool(exc_tb.n_spins == 2)
@@ -49,13 +53,19 @@ def main():
         if args.exciton_dos:
             write_exciton_dos(output, freq_range, write_obj=write_obj)
         else:
-            write_excitons(output, write_obj=write_obj, spin_split=split)
+            write_excitons(output,
+                           write_obj=write_obj,
+                           n_spins=n_spins,
+                           cutoff_info=cutoff_bands_info)
     else:
         with open(args.output_name, 'w') as write_obj:
             if args.exciton_dos:
                 write_exciton_dos(output, freq_range, write_obj=write_obj)
             else:
-                write_excitons(output, write_obj=write_obj, spin_split=split)
+                write_excitons(output,
+                               write_obj=write_obj,
+                               n_spins=n_spins,
+                               cutoff_info=cutoff_bands_info)
 
 
 if __name__ == '__main__':
