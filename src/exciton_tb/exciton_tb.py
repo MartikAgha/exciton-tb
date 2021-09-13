@@ -45,6 +45,9 @@ class ExcitonTB:
                      {'radius_0': Inherent screening value for keldysh int.,
                       'substrate_dielectric': dielectric const. of substrate,
                       'gamma': Potential decay value for Yukawa potential}
+        :param cell_wise_centering: Set to True to center the motif within the
+                                    unit cell and set to False to center
+                                    within the entire periodic supercell
         """
         self.potential_name = potential_name
         self.interaction_args = self.default_args if args is None else args
@@ -60,27 +63,26 @@ class ExcitonTB:
         self.b2 = np.array(self.file_storage['crystal']['gvecs']['b2']).ravel()
         self.motif_vectors = np.array(self.file_storage['crystal']['motif'])
 
+        # Extract info necessary for iterating over the atoms and bands
         self.n_atoms = int(np.array(self.file_storage['crystal']['n_atoms']))
         self.n_orbs = int(np.array(self.file_storage['crystal']['n_orbs']))
         self.n_k = int(np.array(self.file_storage['eigensystem']['n_k']))
         self.n_val = int(np.array(self.file_storage['eigensystem']['n_val']))
         self.n_con = int(np.array(self.file_storage['eigensystem']['n_con']))
-
         self.n_spins = int(np.array(
             self.file_storage['eigensystem']['n_spins']
         ))
-        self.convention = int(np.array(
-            self.file_storage['eigensystem']['convention']
-        ))
-
         if self.n_spins not in [1, 2]:
             raise ValueError("eigensystem/n_spins must be either 1 or 2.")
 
+        self.convention = int(np.array(
+            self.file_storage['eigensystem']['convention']
+        ))
         self.is_complex = bool(np.array(
             self.file_storage['eigensystem']['is_complex']
         ))
 
-        # Acrue real-space and reciprocal-space grid.
+        # Obtain real-space and reciprocal-space grid.
         self.k_grid = np.array(self.file_storage['eigensystem']['k_grid'])
         self.cell_wise_centering = cell_wise_centering
         self.r_grid = get_supercell_positions(self.a1,
@@ -92,12 +94,17 @@ class ExcitonTB:
         self.trunc_alat = float(np.array(
             self.file_storage['crystal']['trunc_alat']
         ))
+        # Repeating orbital pattern to partially collapse a dot product of
+        # eigenvectors in the orbital space
         self.orb_pattern = list(map(int, list(np.array(
             self.file_storage['crystal']['orb_pattern']).ravel()
         )))
+        # List of indices between which elements of TB eigenvectors
+        # corresponding to orbitals on the same atoms can be grouped
         self.cumulative_positions = get_cumulative_positions(self.orb_pattern,
                                                              self.n_orbs)
 
+        # selective --> finite energy cutoff
         self.selective_mode = bool(np.array(self.file_storage['selective']))
         if self.selective_mode:
             num_states = np.array(
@@ -110,7 +117,6 @@ class ExcitonTB:
 
         if not os.path.exists(self.matrix_element_dir):
             os.mkdir(self.matrix_element_dir)
-
         self.element_storage_name = None
         self.energy_cutoff = None
 
@@ -121,6 +127,7 @@ class ExcitonTB:
         """
         Create matrix elements for the direct coulomb interaction
         :param storage_name: name for the hdf5 storage for matrix elements.
+        :param energy_cutoff: cutoff energy for transitions included.
         :return:
         """
         self.element_storage_name = os.path.join(self.matrix_element_dir,
@@ -133,24 +140,27 @@ class ExcitonTB:
         # Containers for outputted data
         pos_list = self.r_grid
 
-        # Place holder function to get cutoff_band_min_maxes
         self.set_energy_cutoff(energy_cutoff)
+        # List of (min valence band, max conduction band) pairs, for each
+        # spin and k-point in the tight-binding eigensystems.
         cutoff_band_min_maxes = self.get_cutoff_band_min_maxes(energy_cutoff)
 
         with hp.File(self.element_storage_name, 'w') as f:
             eigvecs = self.get_preprocessed_eigenvectors()
+            # electron-hole interaction potential in matrix form, which is
+            # V(k-k')_ij=Sum_R(V(R + ti - tj)*exp[-i*k.(R + ti - tj)])/Nk^2
             eh_int = self.get_eh_int(nat, nk, pos_list)
+
             f['VkM'] = eh_int
             f['use_energy_cutoff'] = bool(energy_cutoff is not None)
             f['energy_cutoff'] = 0 if energy_cutoff is None else energy_cutoff
+
             cutoff_bands = f.create_group('cutoff_bands')
             nk_shift = nk if nk == 1 else 2*nk
 
             state_shift = self.n_spins*norb
 
             for s0 in range(self.n_spins):
-                # Two separate sets for up and down spin for non-exchange
-                # Assuming a Gamma-point calculation for now in supercell
                 spins = f.create_group(self.spin_str % s0)
                 spins_cutoff = cutoff_bands.create_group(self.spin_str % s0)
 
@@ -167,8 +177,6 @@ class ExcitonTB:
                         # Indices to navigate through k,k' data
                         ml1 = m1 - l1 + nk if nk > 1 else 0
                         ml2 = m2 - l2 + nk if nk > 1 else 0
-                        # ml1 = (m1 - l1) % nk
-                        # ml2 = (m2 - l2) % nk
 
                         bandnum_m = self.get_number_conduction_valence_bands(
                             ki_m, s0
@@ -192,6 +200,8 @@ class ExcitonTB:
                         else:
                             v_min_m, v_min_l = 0, 0
 
+                        # empty arrays for which the columns are the partially
+                        # collapsed dot-product in orbital space
                         valence = np.zeros((nat, v_num_m*v_num_l),
                                            dtype='complex')
                         conduction = np.zeros((nat, c_num_m*c_num_l),
@@ -205,7 +215,9 @@ class ExcitonTB:
 
                         vb_iter = product(range(v_num_m), range(v_num_l))
                         for v1, v2 in vb_iter:
-                            # for v1, k' and v2, k find matrix element
+                            # for v1, k' and v2, k, obtain the reduced
+                            # dot product in the orbital space of the
+                            # eigenvectors, using cumulative indices.
                             # This is reversed compared to conduction band
                             vm_i = v2*v_num_m + v1
                             valence[:, vm_i] = reduced_tb_vec(
@@ -217,7 +229,9 @@ class ExcitonTB:
 
                         cb_iter = product(range(c_num_m), range(c_num_l))
                         for c1, c2 in cb_iter:
-                            # for c1, k and c2, k' find matrix element
+                            # for c1, k and c2, k' obtain the reduced
+                            # dot product in the orbital space of the
+                            # eigenvectors, using cumulative indices.
                             cm_i = c1*c_num_l + c2
                             conduction[:, cm_i] = reduced_tb_vec(
                                 eigvecs[e_m:e_m + norb, v_min_m + v_num_m + c1],
@@ -231,6 +245,8 @@ class ExcitonTB:
                                                     shape=elem_shape,
                                                     dtype='complex')
 
+                        # All DIRECT integrals for vector difference k-k'
+                        # can be found in this matrix (elems)
                         elems[:] = np.dot(np.array(conduction).T,
                                           np.dot(eh_int[ml1*nk_shift + ml2],
                                                  np.array(valence)))
@@ -259,6 +275,8 @@ class ExcitonTB:
         n_val, n_con = self.n_val, self.n_con
         selective = self.selective_mode
 
+        # Get the indices that divide the matrix into blocks corresponding to
+        # k points, conduction and valence band.
         mat_dim, blocks = self.get_matrix_dim_and_block_starts(g)
         block_skip = n_con*n_val
         spin_shift = n_con + n_val
@@ -266,6 +284,7 @@ class ExcitonTB:
         q_zero = np.array([0, 0])
 
         for m1, m2 in product(range(nk), range(nk)):
+            # idx of first k-point
             k_i = nk*m1 + m2
             # Diagonal elements: Use cb/vb energy differences
             energy_k, energy_kq = self.get_diag_eigvals(k_idx=k_i,
@@ -286,6 +305,7 @@ class ExcitonTB:
                 # account for energy cutoff.
                 spin_skip = s0*(vnum1 + cnum1) if selective else s0*spin_shift
 
+                # For cutoff calculations, get minimum valence band
                 if energy_cutoff_bool:
                     k_str = '(%d,%d)' % (m1, m2)
                     s_str = self.spin_str % s0
@@ -299,6 +319,7 @@ class ExcitonTB:
                 else:
                     v_min = 0
 
+                # Diagonal direct integrals
                 for c, v in product(range(cnum1), range(vnum1)):
                     mat_idx = k_skip + c*vnum1 + v
                     final_energy = energy_kq[v_min + vnum1 + c + spin_skip]
@@ -311,6 +332,7 @@ class ExcitonTB:
 
             # Off-diagonal elements:
             for l1, l2 in product(range(nk), range(nk)):
+                # idx of second k-point
                 kp_i = nk*l1 + l2
                 kkp_1bz = [m1, m2, l1, l2]
                 for s0 in range(self.n_spins):
@@ -354,6 +376,8 @@ class ExcitonTB:
 
                     for c1, c2 in product(range(cnum1), range(cnum2)):
                         for v1, v2 in product(range(vnum1), range(vnum2)):
+                            # Determine indices for the direct integral matrix
+                            # and extract it from the precalculated input file
                             fin_idx = k_skip + c1*vnum1 + v1
                             init_idx = kp_skip + c2*vnum2 + v2
 
@@ -379,6 +403,10 @@ class ExcitonTB:
 
     def get_vector_modulo_cell(self, vector, macro_cell=False):
         """
+        Given a vector in or out of the cell, find its equivalent point inside
+        the cell
+        :param vector: Vector to discern.
+        :param macro_cell: Consider the whole periodic supercell.
         :return:
         """
         cell_factor = self.n_k if macro_cell else 1
@@ -389,6 +417,14 @@ class ExcitonTB:
         return vector_modulo_cell
 
     def create_fourier_matrix(self, pos, pos_idx, kdiff):
+        """
+        Create matrix with a column and row basis equivalent to the motif,
+        where each element is the lattice Fourier transform of the
+        :param pos: Lattice vector R
+        :param pos_idx: index of lattice vector R in self.positions
+        :param kdiff: Difference k-k' of wavevectors for the Fourier transform
+        :return:
+        """
         fmatrix = np.array([
             [self.fourier_int((i, j), pos, pos_idx, kdiff)
              for j in range(self.n_atoms)] for i in range(self.n_atoms)
@@ -414,20 +450,27 @@ class ExcitonTB:
             mat_term = self.create_fourier_matrix(pos=pos,
                                                   pos_idx=pos_idx,
                                                   kdiff=None)
-
             eh_int[0] += mat_term
         else:
             # Considering all differences between possible k-points
+            # For each difference between nk2 k points, have a lattice fourier
+            # transform for each ti - tj in the motif (nat X nat)
             eh_int = list(np.zeros((4*nk2, nat, nat), dtype=complex))
+
             for ml1, ml2 in product(range(2*nk), range(2*nk)):
+                # centre kdiff grid by subtracting nk from index.
                 kdiff = (ml1 - nk)*b1 + (ml2 - nk)*b2
                 for r1, r2 in product(range(nk), range(nk)):
+                    # For each R = r1*a1 + r1*a2, calculate fourier term
+                    # and sum up to get the lattice Fourier transform
                     pos_idx = r1*nk + r2
                     pos = pos_list[r1*nk + r2]
                     mat_term = self.create_fourier_matrix(pos=pos,
                                                           pos_idx=pos_idx,
                                                           kdiff=kdiff)
                     eh_int[ml1*2*nk + ml2] += mat_term
+
+            # Ignore this code below.
             # eh_int = list(np.zeros((nk2, nat, nat), dtype=complex))
             # for ml1, ml2 in product(range(nk), range(nk)):
             #     kdiff = ml1*b1 + ml2*b2
@@ -457,10 +500,10 @@ class ExcitonTB:
     def fourier_int(self, idx_pair, pos, pos_idx, kpt):
         """
         Get the Lattice fourier transform of the interaction potential.
-        :param pos: position of the cell in the supercell grid
-        :param i: ith index of atom in cell
-        :param j: jth index of atom in cell
-        :param kpt: k point for the exponential
+        :param idx_pair: (i, j) pair of indices for the motif vectors ti, tj
+        :param pos: Lattice vector R
+        :param pos_idx: Index of lattice vector R in self.positions (obsolete)
+        :param kpt: k-point in the fourier transform
         :return:
         """
         i, j = idx_pair
@@ -493,8 +536,8 @@ class ExcitonTB:
 
     def get_matrix_dim_and_block_starts(self, element_storage):
         """
-        Get matrix dimensions.
-        :param split:
+        Get matrix dimensions and start indices in the BSE matrix to divide it
+        into blocks corresponding to different k points and c/v bands.
         :return: matrix_dimension, block_skips
         """
         n_val, n_con, nk2 = self.n_val, self.n_con, self.n_k**2
@@ -651,31 +694,28 @@ class ExcitonTB:
         :return:
         """
         f = self.file_storage
+
         if self.is_complex:
             eigenvectors = np.array(f['eigensystem']['eigenvectors'])
         else:
+            # Conjoin real and imaginary parts if separate in the input file.
             eigvecs_real = np.array(f['eigensystem']['eigenvectors_real'])
             eigvecs_imag = np.array(f['eigensystem']['eigenvectors_imag'])
             eigenvectors = eigvecs_real + 1j*eigvecs_imag
 
         if self.convention == 2:
+            # If convention is not 1, rotate eigenvectors using motif vectors.
             eigenvectors = convert_all_eigenvectors(eigenvectors,
                                                     self.k_grid,
                                                     self.motif_vectors,
                                                     self.orb_pattern,
                                                     self.n_orbs,
                                                     bool(self.n_spins == 2))
-        # elif self.convention == 1:
         elif not self.convention == 1:
-            # eigenvectors = unconvert_all_eigenvectors(eigenvectors,
-            #                                           self.k_grid,
-            #                                           self.motif_vectors,
-            #                                           self.orb_pattern,
-            #                                           self.n_orbs,
-            #                                           bool(self.n_spins == 2))
             raise ValueError("Convention should be 1 or 2.")
 
         eigenvalues = np.array(f['eigensystem']['eigenvalues'])
+        # Othogonalize and create consisten relative phase.
         eigenvectors = orthogonalize_eigenvecs(eigenvalues, eigenvectors)
         return eigenvectors
 
@@ -684,8 +724,8 @@ class ExcitonTB:
         Calculate an array of all minimum valence band indices and maximum
         conduction band indices for each k point index and spin index
         (if applicable).
-        @param energy_cutoff: Value with which to deteremine required bands.
-        @return:
+        :param energy_cutoff: Value with which to deteremine required bands.
+        :return:
         """
         if energy_cutoff is None:
             energy_cutoff = self.energy_cutoff
@@ -719,10 +759,10 @@ class ExcitonTB:
         Given an energy cutoff, finds the band indices that given the minimum
         valence band within the cutoff below the conduction band, and the
         maximum conduction band within a cutoff above the valence band.
-        @param eigenvalues: list of eigenvalues
-        @param energy_cutoff: energy to decide which bands we require
-        @param edge_index: index of the conduction band
-        @return:
+        :param eigenvalues: list of eigenvalues
+        :param energy_cutoff: energy to decide which bands we require
+        :param edge_index: index of the conduction band
+        :return:
         """
 
         max_energy = eigenvalues[edge_index - 1] + energy_cutoff
